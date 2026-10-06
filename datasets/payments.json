@@ -1,0 +1,5 @@
+[
+ {"idempotencyKey":"dataset-payment-001","merchantId":"merchant-demo","amount":25.50,"currency":"PEN","token":"tok_demo_001"},
+ {"idempotencyKey":"dataset-payment-002","merchantId":"merchant-demo","amount":99.90,"currency":"USD","token":"tok_demo_002"},
+ {"idempotencyKey":"dataset-payment-003","merchantId":"merchant-demo","amount":350.00,"currency":"PEN","token":"tok_demo_003"}
+]

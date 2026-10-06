@@ -1,0 +1,87 @@
+# Se utiliza como configuración externa de ejemplo para payment-service.
+# Las configuraciones activas de cada servicio se encuentran en src/main/resources/application.yml.
+spring:
+  config:
+    # Se importa el archivo de endpoints generado en el directorio indicado por AXIZ_RUNTIME_DIRECTORY.
+    # Se admiten .runtime/ para host, /app/runtime/ para Compose y /runtime/ para pods.
+    import: optional:file:${AXIZ_RUNTIME_DIRECTORY:.runtime/}aws.properties
+  application:
+    # payment-service, acquirer-service o settlement-service; se identifica el servicio en métricas y sesiones STS.
+    name: payment-service
+  threads:
+    virtual:
+      # true: hilos virtuales para solicitudes. false: hilos de plataforma.
+      enabled: true
+server:
+  # Se admite un puerto entre 1024 y 65535; se usan 8080, 8081 y 8082 respectivamente.
+  port: 8080
+  # graceful: se espera la finalización de solicitudes. immediate: se interrumpe el servidor.
+  shutdown: graceful
+axiz:
+  aws:
+    # Se admite cualquier región AWS publicada; la precarga usa us-east-1.
+    region: us-east-1
+    # URL http de Floci local; vacío para endpoints oficiales de AWS mediante el SDK.
+    endpoint: http://localhost:4566
+    # ARN de axiz-payment, axiz-acquirer o axiz-settlement. Vacío activa DefaultCredentialsProvider.
+    role-arn: arn:aws:iam::000000000000:role/axiz-payment
+    # Ruta absoluta o relativa del JWT firmado; se renueva sin cambiar el nombre del archivo.
+    token-file: .runtime/payment.token
+  # Se admite el nombre o ARN del secreto de autenticación interna de los tres servicios.
+  internal-secret-id: /axiz/internal-key
+  database:
+    # true: PostgreSQL con tokens IAM. false: servicio sin almacenamiento relacional, como acquirer-service.
+    enabled: true
+    # localhost: ejecución en host. floci: red Compose o alias del pod. En AWS se usa el endpoint Aurora.
+    host: localhost
+    # Se admite el puerto devuelto por DescribeDBClusters; la PoC reserva 7001.
+    port: 7001
+    # Se admite un identificador de base PostgreSQL; se aprovisiona axiz.
+    name: axiz
+    # axiz_payment o axiz_settlement. No se utiliza el propietario de bootstrap en tiempo de ejecución.
+    user: axiz_payment
+    # payment o settlement; cada servicio mantiene su esquema.
+    schema: payment
+    # Ruta al certificado CA PEM. Se aplica siempre sslmode=verify-full.
+    ca: .runtime/rds-ca.crt
+  # true: workers activos. false: workers deshabilitados.
+  jobs-enabled: true
+  # URL base http local o https del adquirente; no se agrega una ruta final.
+  acquirer-url: http://localhost:8081
+  # ARN SNS FIFO del evento financiero definitivo; se mantiene el sufijo .fifo.
+  topic-arn: arn:aws:sns:us-east-1:000000000000:axiz-payments.fifo
+  # URL SQS FIFO de liquidación. En AWS se utiliza la URL devuelta por CreateQueue.
+  queue-url: http://localhost:4566/000000000000/axiz-settlement.fifo
+  # Nombre de bucket S3 conforme a DNS; se aprovisiona axiz-receipts.
+  bucket: axiz-receipts
+  # Nombre DynamoDB de proyección de liquidaciones.
+  projection-table: axiz-settlements
+  # Nombre DynamoDB de autorizaciones idempotentes.
+  acquirer-table: axiz-authorizations
+  # Nombre o ARN de bus EventBridge; se usa axiz-payments.
+  event-bus: axiz-payments
+  # Alias o ARN de clave KMS RSA_2048 SIGN_VERIFY. Se usa RSASSA_PSS_SHA_256.
+  kms-key: alias/axiz-receipts
+  # Lista host:puerto separada por comas. El endpoint efectivo se obtiene del archivo siguiente si existe.
+  kafka-bootstrap: localhost:9092
+  # Ruta del endpoint descubierto. Vacío usa kafka-bootstrap directamente.
+  kafka-bootstrap-file: .runtime/kafka-bootstrap
+  # Nombre del topic Kafka; se publica con paymentId como clave y acks=all.
+  kafka-topic: axiz.payment.events
+  # localhost: host. floci: Compose o pod. En AWS se utiliza el endpoint ElastiCache.
+  redis-host: localhost
+  # Se admite un puerto TCP; la PoC reserva 6379.
+  redis-port: 6379
+  resilience:
+    # Entero positivo; límite de milisegundos por intento.
+    timeout-ms: 900
+    # Entero desde 1; se incluye el intento inicial.
+    max-attempts: 3
+    # Entero positivo; llamadas activas permitidas por instancia.
+    max-concurrent: 8
+    # Entero positivo; solicitudes de creación por segundo.
+    ingress-per-second: 30
+    # Entero positivo; intentos salientes por segundo.
+    outbound-per-second: 20
+    # Entero positivo; segundos antes de permitir sondas HALF_OPEN.
+    open-seconds: 10

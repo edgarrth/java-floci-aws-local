@@ -1,0 +1,6 @@
+{
+  "merchantId": "merchant-demo",
+  "amount": 25.5,
+  "currency": "PEN",
+  "token": "tok_demo"
+}

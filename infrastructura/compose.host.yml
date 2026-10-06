@@ -1,0 +1,4 @@
+services:
+  bootstrap:
+    environment:
+      BOOTSTRAP_TARGET: host

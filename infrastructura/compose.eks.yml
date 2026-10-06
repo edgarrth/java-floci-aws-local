@@ -1,0 +1,7 @@
+services:
+  floci:
+    environment:
+      FLOCI_SERVICES_EKS_MOCK: "false"
+  bootstrap:
+    environment:
+      BOOTSTRAP_TARGET: eks

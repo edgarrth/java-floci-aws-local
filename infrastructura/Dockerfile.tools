@@ -1,0 +1,10 @@
+FROM java-base
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv curl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY infrastructura/requirements.txt /tmp/requirements.txt
+RUN python3 -m venv /opt/axiz-tools && /opt/axiz-tools/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+ENV PATH="/opt/axiz-tools/bin:${PATH}"
+RUN curl --fail --silent --show-error --location https://download.docker.com/linux/static/stable/x86_64/docker-28.5.2.tgz -o /tmp/docker.tgz && tar -xzf /tmp/docker.tgz -C /tmp && cp /tmp/docker/docker /usr/local/bin/docker && rm -rf /tmp/docker /tmp/docker.tgz
+WORKDIR /workspace
+COPY infrastructura /workspace/infrastructura
+COPY datasets /workspace/datasets

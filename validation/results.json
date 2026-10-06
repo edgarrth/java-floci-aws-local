@@ -1,0 +1,22 @@
+{
+  "java": "25",
+  "maven": "3.10.0",
+  "spring_boot": "4.1.1",
+  "resilience4j": "2.4.0",
+  "tests": {
+    "passed": 29,
+    "skipped": 4,
+    "failures": 0,
+    "errors": 0
+  },
+  "checks": {
+    "java_format": "Spotless aprobado",
+    "python_linter": "Ruff aprobado",
+    "shell_linter": "ShellCheck aprobado",
+    "yaml": "Sintaxis aprobada"
+  },
+  "limitations": [
+    "No se ejecutó Compose ni EKS: Docker no está disponible en el entorno de validación.",
+    "Las cuatro pruebas PostgreSQL con Testcontainers están compiladas, pero omitidas."
+  ]
+}

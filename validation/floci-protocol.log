@@ -1,0 +1,10 @@
+OIDC identity configured
+Resources and least-privilege policies configured
+IRSA signature and subject enforcement passed
+IAM deny passed
+SSM, Secrets Manager, CloudWatch and EventBridge runtime permissions passed
+SNS FIFO and SQS ack passed
+KMS signing and S3 persistence passed
+API Gateway provisioning passed
+API Gateway HTTP proxy, path parameters and authentication header forwarding passed
+Java 25 / Boot 4.1.1 REST startup, DynamoDB idempotency, query, route catalogue and 401 passed
