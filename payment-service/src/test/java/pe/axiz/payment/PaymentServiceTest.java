@@ -4,187 +4,160 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
-import java.time.Clock;
+import java.time.*;
 import java.util.*;
-import java.util.concurrent.*;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import pe.axiz.payment.application.ports.in.ProcessPaymentUseCase.Command;
 import pe.axiz.payment.application.ports.out.*;
 import pe.axiz.payment.application.service.PaymentService;
 import pe.axiz.payment.domain.*;
 
 class PaymentServiceTest {
-  static class Store implements PaymentStore {
-    final Map<UUID, Payment> payments = new HashMap<>();
-    final Map<String, UUID> keys = new HashMap<>();
-
-    public synchronized Reservation reserve(Payment p) {
-      String k = p.merchantId() + p.idempotencyKey();
-      if (keys.containsKey(k)) return new Reservation(payments.get(keys.get(k)), false);
-      keys.put(k, p.id());
-      payments.put(p.id(), p);
-      return new Reservation(p, true);
-    }
-
-    public synchronized Payment complete(Payment p) {
-      payments.put(p.id(), p);
-      return p;
-    }
-
-    public synchronized Optional<Payment> find(UUID id) {
-      return Optional.ofNullable(payments.get(id));
-    }
-
-    public List<UUID> unresolved() {
-      return List.of();
-    }
-  }
-
-  private AuthorizationPort authorizer;
-  private PaymentService service;
-  private Store store;
-
-  Command command(String key) {
-    return new Command("merchant-demo", new Money(new BigDecimal("25.00"), "PEN"), "tok_demo", key);
-  }
+  private final PaymentStore store = mock(PaymentStore.class);
+  private final MerchantPolicyPort policies = mock(MerchantPolicyPort.class);
+  private final Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneOffset.UTC);
+  private final PaymentService service = new PaymentService(store, policies, clock);
 
   @BeforeEach
-  void init() {
-    authorizer = mock(AuthorizationPort.class);
-    store = new Store();
-    service = new PaymentService(store, authorizer, m -> new BigDecimal("5000"), Clock.systemUTC());
-    when(authorizer.authorize(any()))
-        .thenReturn(new AuthorizationPort.Decision(Payment.Status.AUTHORIZED, "AX123"));
+  void defaults() {
+    when(policies.limit("merchant-demo")).thenReturn(new BigDecimal("5000.00"));
+    when(store.findByKey(anyString(), anyString())).thenReturn(Optional.empty());
+    when(store.record(any())).thenAnswer(invocation -> invocation.getArgument(0));
+  }
+
+  Command command(String key, String amount) {
+    return new Command("merchant-demo", new Money(new BigDecimal(amount), "PEN"), "tok_demo", key);
   }
 
   @Test
-  void authorization() {
-    var p = service.process(command("key-00001"));
-    assertThat(p.status()).isEqualTo(Payment.Status.AUTHORIZED);
+  void acceptsPolicyCompliantPaymentWithStableTimestamp() {
+    var payment = service.process(command("test-key-001", "25.50"));
+    assertThat(payment.status()).isEqualTo(Payment.Status.ACCEPTED);
+    assertThat(payment.reason()).isEqualTo("POLICY_ACCEPTED");
+    assertThat(payment.createdAt()).isEqualTo(clock.instant());
+    assertThat(payment.fingerprint()).hasSize(64);
+    verify(store).record(payment);
   }
 
   @Test
-  void repeatUsesStoredResult() {
-    var a = service.process(command("key-00002"));
-    var b = service.process(command("key-00002"));
-    assertThat(b.id()).isEqualTo(a.id());
-    verify(authorizer, times(1)).authorize(any());
+  void persistsRejectionAboveMerchantLimit() {
+    var payment = service.process(command("test-key-002", "5000.01"));
+    assertThat(payment.status()).isEqualTo(Payment.Status.REJECTED);
+    assertThat(payment.reason()).isEqualTo("MERCHANT_LIMIT_EXCEEDED");
+    verify(store).record(payment);
   }
 
   @Test
-  void conflictingBody() {
-    service.process(command("key-00003"));
-    assertThatThrownBy(
-            () ->
-                service.process(
-                    new Command(
-                        "merchant-demo",
-                        new Money(new BigDecimal("26"), "PEN"),
-                        "tok_demo",
-                        "key-00003")))
+  void acceptsExactLimit() {
+    assertThat(service.process(command("test-key-003", "5000.00")).status())
+        .isEqualTo(Payment.Status.ACCEPTED);
+  }
+
+  @Test
+  void replayDoesNotRequireConfigurationOrCreateEvents() {
+    var original = service.process(command("test-key-004", "25.50"));
+    clearInvocations(store, policies);
+    when(store.findByKey("merchant-demo", "test-key-004")).thenReturn(Optional.of(original));
+    assertThat(service.process(command("test-key-004", "25.5"))).isEqualTo(original);
+    verifyNoInteractions(policies);
+    verify(store, never()).record(any());
+  }
+
+  @Test
+  void rejectsChangedPayloadForExistingKey() {
+    var original = service.process(command("test-key-005", "25.50"));
+    when(store.findByKey("merchant-demo", "test-key-005")).thenReturn(Optional.of(original));
+    assertThatThrownBy(() -> service.process(command("test-key-005", "25.51")))
         .isInstanceOf(IllegalStateException.class);
   }
 
   @Test
-  void transportFailureIsUnknown() {
-    when(authorizer.authorize(any()))
-        .thenThrow(new IllegalStateException("Se perdió la respuesta"));
-    var p = service.process(command("key-00004"));
-    assertThat(p.status()).isEqualTo(Payment.Status.UNKNOWN);
+  void resolvesConcurrentReservationToExistingPayment() {
+    var first = service.process(command("test-key-006", "25.50"));
+    when(store.record(any())).thenReturn(first);
+    assertThat(service.process(command("test-key-006", "25.50"))).isEqualTo(first);
   }
 
   @Test
-  void reconciliationUsesQuery() {
-    when(authorizer.authorize(any())).thenThrow(new IllegalStateException());
-    var p = service.process(command("key-00005"));
-    when(authorizer.query(any()))
-        .thenReturn(new AuthorizationPort.Decision(Payment.Status.AUTHORIZED, "AX1"));
-    assertThat(service.reconcile(p.id()).status()).isEqualTo(Payment.Status.AUTHORIZED);
-    verify(authorizer, times(1)).authorize(any());
-    verify(authorizer, times(1)).query(any());
+  void detectsConcurrentKeyConflict() {
+    var first = service.process(command("test-key-007", "25.50"));
+    when(store.record(any())).thenReturn(first);
+    assertThatThrownBy(() -> service.process(command("test-key-007", "26.00")))
+        .isInstanceOf(IllegalStateException.class);
   }
 
   @Test
-  void finalDoesNotReauthorize() {
-    var p = service.process(command("key-00006"));
-    service.reconcile(p.id());
-    verify(authorizer, never()).query(any());
+  void readsRecordedPayment() {
+    var payment = service.process(command("test-key-008", "1.00"));
+    when(store.find(payment.id())).thenReturn(Optional.of(payment));
+    assertThat(service.get(payment.id())).isEqualTo(payment);
   }
 
   @Test
-  void rejectsPan() {
+  void rejectsMissingPayment() {
+    assertThatThrownBy(() -> service.get(UUID.randomUUID()))
+        .isInstanceOf(NoSuchElementException.class);
+  }
+
+  @Test
+  void refusesCardNumberAsToken() {
     assertThatThrownBy(
             () ->
                 service.process(
                     new Command(
                         "merchant-demo",
-                        command("key-00007").money(),
+                        new Money(BigDecimal.ONE, "PEN"),
                         "4111111111111111",
-                        "key-00007")))
+                        "test-key-009")))
         .isInstanceOf(IllegalArgumentException.class);
-    verifyNoInteractions(authorizer);
+    verifyNoInteractions(store, policies);
   }
 
   @Test
-  void rejectsOverLimit() {
+  void validatesMerchantIdentifierBeforeInfrastructure() {
     assertThatThrownBy(
             () ->
                 service.process(
                     new Command(
-                        "merchant-demo",
-                        new Money(new BigDecimal("5001"), "PEN"),
+                        "../merchant",
+                        new Money(BigDecimal.ONE, "PEN"),
                         "tok_demo",
-                        "key-00008")))
+                        "test-key-010")))
+        .isInstanceOf(IllegalArgumentException.class);
+    verifyNoInteractions(store, policies);
+  }
+
+  @Test
+  void validatesIdempotencyKey() {
+    assertThatThrownBy(() -> service.process(command("short", "1.00")))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
-  void declineIsFinal() {
-    when(authorizer.authorize(any()))
-        .thenReturn(new AuthorizationPort.Decision(Payment.Status.DECLINED, "DECLINED"));
-    assertThat(service.process(command("key-00009")).terminal()).isTrue();
-  }
-
-  @Test
-  void concurrentReplayCallsAcquirerOnce() throws Exception {
-    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-      var tasks = new ArrayList<Future<Payment>>();
-      for (int i = 0; i < 20; i++)
-        tasks.add(executor.submit(() -> service.process(command("key-00010"))));
-      var ids = new HashSet<UUID>();
-      for (var t : tasks) ids.add(t.get().id());
-      assertThat(ids).hasSize(1);
-      verify(authorizer, times(1)).authorize(any());
-    }
-  }
-
-  @Test
-  void moneyNormalizes() {
-    assertThat(new Money(new BigDecimal("2"), "USD").amount()).isEqualByComparingTo("2.00");
-  }
-
-  @Test
-  void moneyRejectsFraction() {
-    assertThatThrownBy(() -> new Money(new BigDecimal("2.001"), "USD"))
-        .isInstanceOf(ArithmeticException.class);
-  }
-
-  @Test
-  void moneyRejectsNegative() {
-    assertThatThrownBy(() -> new Money(new BigDecimal("-1"), "PEN"))
+  void validatesPositiveAmount() {
+    assertThatThrownBy(() -> new Money(BigDecimal.ZERO, "PEN"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
-  void moneyRejectsCurrency() {
+  void validatesSupportedCurrency() {
     assertThatThrownBy(() -> new Money(BigDecimal.ONE, "EUR"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
-  void terminalCannotChange() {
-    var p = service.process(command("key-00011"));
-    assertThatThrownBy(() -> p.complete(Payment.Status.DECLINED, null))
-        .isInstanceOf(IllegalStateException.class);
+  void validatesExactDecimalPrecision() {
+    assertThatThrownBy(() -> new Money(new BigDecimal("1.001"), "PEN"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void doesNotRecordWhenParameterStoreFails() {
+    when(policies.limit("merchant-demo"))
+        .thenThrow(new IllegalArgumentException("No se encontró el comercio"));
+    assertThatThrownBy(() -> service.process(command("test-key-011", "1.00")))
+        .isInstanceOf(IllegalArgumentException.class);
+    verify(store, never()).record(any());
   }
 }

@@ -16,7 +16,7 @@ for index, base in enumerate(sys.argv[1:]):
             time.sleep(2)
     else:
         raise TimeoutError("No se pudo obtener el catálogo de " + base)
-    print("Servicio: " + ["pagos", "adquirente", "liquidación"][index])
+    print("Servicio: " + ["pagos", "liquidación"][index])
     for route in routes:
         print("  " + route)
     print("  GET /actuator/health/liveness")

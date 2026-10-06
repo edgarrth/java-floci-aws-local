@@ -12,9 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
-import pe.axiz.payment.configuration.ResiliencePolicies;
-import software.amazon.awssdk.services.eventbridge.EventBridgeClient;
-import software.amazon.awssdk.services.eventbridge.model.PutEventsRequestEntry;
+import pe.axiz.platform.configuration.KafkaEndpoint;
 import software.amazon.awssdk.services.sns.SnsClient;
 
 @Component
@@ -24,36 +22,19 @@ public class OutboxPublisher implements AutoCloseable {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final SnsClient sns;
-  private final EventBridgeClient events;
-  private final ResiliencePolicies resilience;
   private final Environment env;
   private final KafkaProducer<String, String> kafka;
 
   record Entry(UUID id, UUID payment, String destination, String payload, int attempts) {}
 
   public OutboxPublisher(
-      JdbcTemplate jdbc,
-      TransactionTemplate tx,
-      SnsClient sns,
-      EventBridgeClient events,
-      ResiliencePolicies resilience,
-      Environment env) {
+      JdbcTemplate jdbc, TransactionTemplate tx, SnsClient sns, Environment env) {
     this.jdbc = jdbc;
     this.tx = tx;
     this.sns = sns;
-    this.events = events;
-    this.resilience = resilience;
     this.env = env;
     Properties p = new Properties();
-    String bootstrap = env.getRequiredProperty("axiz.kafka-bootstrap");
-    String bootstrapFile = env.getProperty("axiz.kafka-bootstrap-file", "");
-    if (!bootstrapFile.isBlank()) {
-      try {
-        bootstrap = java.nio.file.Files.readString(java.nio.file.Path.of(bootstrapFile)).trim();
-      } catch (java.io.IOException ex) {
-        throw new IllegalStateException("No se pudo leer el endpoint MSK", ex);
-      }
-    }
+    String bootstrap = KafkaEndpoint.resolve(env);
     p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap);
     p.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
     p.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -88,15 +69,7 @@ public class OutboxPublisher implements AutoCloseable {
             });
     for (var e : batch) {
       try {
-        resilience
-            .publisher
-            .executeSupplier(
-                () -> {
-                  deliver(e);
-                  return true;
-                })
-            .toCompletableFuture()
-            .get(12, TimeUnit.SECONDS);
+        deliver(e);
         jdbc.update("UPDATE outbox SET published_at=CURRENT_TIMESTAMP WHERE id=?", e.id());
       } catch (Exception ex) {
         int delay = Math.min(60, 1 << Math.min(6, e.attempts()));
@@ -133,20 +106,6 @@ public class OutboxPublisher implements AutoCloseable {
         } catch (Exception ex) {
           throw new IllegalStateException(ex);
         }
-      }
-      case "EVENTBRIDGE" -> {
-        var response =
-            events.putEvents(
-                b ->
-                    b.entries(
-                        PutEventsRequestEntry.builder()
-                            .eventBusName(env.getRequiredProperty("axiz.event-bus"))
-                            .source("pe.axiz.payments")
-                            .detailType("PaymentFinalized")
-                            .detail(e.payload())
-                            .build()));
-        if (response.failedEntryCount() > 0)
-          throw new IllegalStateException("EventBridge rechazó el evento");
       }
       default -> throw new IllegalArgumentException("Destino desconocido");
     }

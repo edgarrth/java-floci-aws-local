@@ -9,6 +9,4 @@ public interface ProcessPaymentUseCase {
   Payment process(Command command);
 
   Payment get(UUID id);
-
-  Payment reconcile(UUID id);
 }

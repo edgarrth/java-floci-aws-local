@@ -3,6 +3,5 @@ WORKDIR /workspace
 COPY mvnw pom.xml ./
 COPY platform/pom.xml platform/pom.xml
 COPY payment-service/pom.xml payment-service/pom.xml
-COPY acquirer-service/pom.xml acquirer-service/pom.xml
 COPY settlement-service/pom.xml settlement-service/pom.xml
 RUN chmod +x mvnw && ./mvnw -B -ntp org.apache.maven.plugins:maven-dependency-plugin:3.11.0:go-offline -DexcludeReactor=true

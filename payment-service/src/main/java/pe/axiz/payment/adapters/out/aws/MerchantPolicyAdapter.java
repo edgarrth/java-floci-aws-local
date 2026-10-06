@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import pe.axiz.payment.application.ports.out.MerchantPolicyPort;
 import software.amazon.awssdk.services.ssm.SsmClient;
+import software.amazon.awssdk.services.ssm.model.ParameterNotFoundException;
 
 @Component
 public class MerchantPolicyAdapter implements MerchantPolicyPort {
@@ -29,8 +30,16 @@ public class MerchantPolicyAdapter implements MerchantPolicyPort {
       /* Se consulta la fuente autoritativa cuando la caché no está disponible. */
     }
     if (cached != null) return new BigDecimal(cached);
-    String value =
-        ssm.getParameter(b -> b.name("/axiz/merchants/" + merchant + "/limit")).parameter().value();
+    String value;
+    try {
+      value =
+          ssm.getParameter(b -> b.name("/axiz/merchants/" + merchant + "/limit"))
+              .parameter()
+              .value();
+    } catch (ParameterNotFoundException exception) {
+      throw new IllegalArgumentException(
+          "El comercio no tiene una política configurada", exception);
+    }
     try {
       redis.opsForValue().set(key, value, Duration.ofSeconds(30));
     } catch (RuntimeException ignored) {

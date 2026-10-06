@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Se despliegan los servicios en el clúster Kubernetes creado por Floci."""
 
+import hashlib
 import json
 import os
 import pathlib
@@ -40,10 +41,9 @@ aliases = [
     {"ip": ip(broker), "hostnames": [broker]},
 ]
 for image in [
-    "axiz-tools:1.0.0",
-    "axiz-payment-service:1.0.0",
-    "axiz-acquirer-service:1.0.0",
-    "axiz-settlement-service:1.0.0",
+    "axiz-tools:2.0.0",
+    "axiz-payment-service:2.0.0",
+    "axiz-settlement-service:2.0.0",
 ]:
     with subprocess.Popen(["docker", "save", image], stdout=subprocess.PIPE) as archive:
         docker(
@@ -60,6 +60,21 @@ for image in [
         archive.stdout.close()
         if archive.wait():
             raise RuntimeError("No se pudo exportar " + image)
+image_ids = {
+    service: docker(
+        "image",
+        "inspect",
+        f"axiz-{service}-service:2.0.0",
+        "--format",
+        "{{.Id}}",
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    for service in ("payment", "settlement")
+}
+config_digest = hashlib.sha256(
+    (RUNTIME / "aws.properties").read_bytes() + (RUNTIME / "rds-ca.crt").read_bytes()
+).hexdigest()
 objects = [
     {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "axiz"}},
     {
@@ -75,8 +90,7 @@ objects = [
 ]
 for service, port, nodeport in [
     ("payment", 8080, 30080),
-    ("acquirer", 8081, 30081),
-    ("settlement", 8082, 30082),
+    ("settlement", 8081, 30081),
 ]:
     name = "axiz-" + service
     meta = {"name": name, "namespace": "axiz"}
@@ -105,18 +119,11 @@ for service, port, nodeport in [
         "DB_CA": "/runtime/rds-ca.crt",
         "REDIS_HOST": "floci",
         "KAFKA_BOOTSTRAP_FILE": "/runtime/kafka-bootstrap",
-        "ACQUIRER_URL": "http://axiz-acquirer:8081",
     }
-    variables.update(
-        {
-            key: value
-            for key, value in os.environ.items()
-            if key.startswith("RESILIENCE_") or key == "JOBS_ENABLED"
-        }
-    )
+    variables.update({key: value for key, value in os.environ.items() if key == "JOBS_ENABLED"})
     app = {
         "name": service,
-        "image": f"axiz-{service}-service:1.0.0",
+        "image": f"axiz-{service}-service:2.0.0",
         "imagePullPolicy": "Never",
         "env": [{"name": k, "value": v} for k, v in variables.items()],
         "ports": [{"containerPort": port}],
@@ -155,7 +162,7 @@ for service, port, nodeport in [
     def identity_container(action, svc=service):
         return {
             "name": "identity-" + action,
-            "image": "axiz-tools:1.0.0",
+            "image": "axiz-tools:2.0.0",
             "imagePullPolicy": "Never",
             "command": [
                 "python3",
@@ -203,7 +210,16 @@ for service, port, nodeport in [
             "spec": {
                 "replicas": 1,
                 "selector": {"matchLabels": {"app": name}},
-                "template": {"metadata": {"labels": {"app": name}}, "spec": pod},
+                "template": {
+                    "metadata": {
+                        "labels": {"app": name},
+                        "annotations": {
+                            "axiz.pe/image-id": image_ids[service],
+                            "axiz.pe/config-digest": config_digest,
+                        },
+                    },
+                    "spec": pod,
+                },
             },
         }
     )
@@ -222,7 +238,7 @@ for service, port, nodeport in [
 manifest = yaml.safe_dump_all(objects, sort_keys=False)
 (RUNTIME / "deployment.local.yml").write_text(manifest)
 kube("apply", "-f", "-", input=manifest.encode())
-for service in ("payment", "acquirer", "settlement"):
+for service in ("payment", "settlement"):
     kube(
         "-n",
         "axiz",
@@ -237,7 +253,6 @@ subprocess.run(
         "python3",
         "datasets/seed.py",
         "http://" + CLUSTER_CONTAINER + ":30080",
-        "http://" + CLUSTER_CONTAINER + ":30081",
     ],
     check=True,
     cwd=ROOT,
@@ -248,7 +263,6 @@ subprocess.run(
         "infrastructura/routes.py",
         "http://" + CLUSTER_CONTAINER + ":30080",
         "http://" + CLUSTER_CONTAINER + ":30081",
-        "http://" + CLUSTER_CONTAINER + ":30082",
     ],
     check=True,
     cwd=ROOT,

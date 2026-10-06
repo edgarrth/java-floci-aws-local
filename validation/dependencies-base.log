@@ -6,11 +6,10 @@
 [INFO] Axiz Floci Payments                                                [pom]
 [INFO] platform                                                           [jar]
 [INFO] payment-service                                                    [jar]
-[INFO] acquirer-service                                                   [jar]
 [INFO] settlement-service                                                 [jar]
 [INFO] 
 [INFO] -----------------------< pe.axiz:floci-payments >-----------------------
-[INFO] Building Axiz Floci Payments 1.0.0                                 [1/5]
+[INFO] Building Axiz Floci Payments 2.0.0                                 [1/4]
 [INFO]   from pom.xml
 [INFO] --------------------------------[ pom ]---------------------------------
 [INFO] 
@@ -841,7 +840,7 @@
 [INFO]       commons-io-2.22.0.jar
 [INFO] 
 [INFO] --------------------------< pe.axiz:platform >--------------------------
-[INFO] Building platform 1.0.0                                            [2/5]
+[INFO] Building platform 2.0.0                                            [2/4]
 [INFO]   from platform/pom.xml
 [INFO] --------------------------------[ jar ]---------------------------------
 [INFO] 
@@ -1667,31 +1666,24 @@
 [INFO]       jaxb-api-2.3.1.jar
 [INFO]       commons-lang3-3.20.0.jar
 [INFO]       commons-io-2.22.0.jar
-[INFO] Resolved dependency: kms-2.55.11.jar
-[INFO] Resolved dependency: sns-2.55.11.jar
-[INFO] Resolved dependency: spring-boot-starter-test-4.1.1.jar
-[INFO] Resolved dependency: dynamodb-2.55.11.jar
-[INFO] Resolved dependency: spring-jdbc-7.0.9.jar
-[INFO] Resolved dependency: resilience4j-micrometer-2.4.0.jar
-[INFO] Resolved dependency: resilience4j-ratelimiter-2.4.0.jar
-[INFO] Resolved dependency: cloudwatch-2.55.11.jar
-[INFO] Resolved dependency: resilience4j-retry-2.4.0.jar
-[INFO] Resolved dependency: postgresql-42.7.13.jar
-[INFO] Resolved dependency: spring-boot-starter-webmvc-4.1.1.jar
-[INFO] Resolved dependency: resilience4j-bulkhead-2.4.0.jar
-[INFO] Resolved dependency: resilience4j-timelimiter-2.4.0.jar
-[INFO] Resolved dependency: HikariCP-7.0.2.jar
 [INFO] Resolved dependency: ssm-2.55.11.jar
-[INFO] Resolved dependency: resilience4j-circuitbreaker-2.4.0.jar
+[INFO] Resolved dependency: url-connection-client-2.55.11.jar
+[INFO] Resolved dependency: dynamodb-2.55.11.jar
+[INFO] Resolved dependency: HikariCP-7.0.2.jar
+[INFO] Resolved dependency: kms-2.55.11.jar
+[INFO] Resolved dependency: sts-2.55.11.jar
+[INFO] Resolved dependency: micrometer-registry-prometheus-1.17.1.jar
+[INFO] Resolved dependency: spring-jdbc-7.0.9.jar
+[INFO] Resolved dependency: spring-boot-starter-test-4.1.1.jar
+[INFO] Resolved dependency: sns-2.55.11.jar
 [INFO] Resolved dependency: spring-boot-starter-actuator-4.1.1.jar
-[INFO] Resolved dependency: rds-2.55.11.jar
-[INFO] Resolved dependency: eventbridge-2.55.11.jar
+[INFO] Resolved dependency: cloudwatch-2.55.11.jar
 [INFO] Resolved dependency: sqs-2.55.11.jar
+[INFO] Resolved dependency: postgresql-42.7.13.jar
 [INFO] Resolved dependency: secretsmanager-2.55.11.jar
 [INFO] Resolved dependency: s3-2.55.11.jar
-[INFO] Resolved dependency: sts-2.55.11.jar
-[INFO] Resolved dependency: url-connection-client-2.55.11.jar
-[INFO] Resolved dependency: micrometer-registry-prometheus-1.17.1.jar
+[INFO] Resolved dependency: rds-2.55.11.jar
+[INFO] Resolved dependency: spring-boot-starter-webmvc-4.1.1.jar
 [INFO] Resolved dependency: aws-json-protocol-2.55.11.jar
 [INFO] Resolved dependency: protocol-core-2.55.11.jar
 [INFO] Resolved dependency: http-auth-aws-2.55.11.jar
@@ -1711,7 +1703,17 @@
 [INFO] Resolved dependency: retries-spi-2.55.11.jar
 [INFO] Resolved dependency: apache5-client-2.55.11.jar
 [INFO] Resolved dependency: netty-nio-client-2.55.11.jar
+[INFO] Resolved dependency: profiles-2.55.11.jar
+[INFO] Resolved dependency: slf4j-api-2.0.18.jar
 [INFO] Resolved dependency: aws-query-protocol-2.55.11.jar
+[INFO] Resolved dependency: jspecify-1.0.1.jar
+[INFO] Resolved dependency: micrometer-core-1.17.1.jar
+[INFO] Resolved dependency: prometheus-metrics-core-1.7.0.jar
+[INFO] Resolved dependency: prometheus-metrics-tracer-common-1.7.0.jar
+[INFO] Resolved dependency: prometheus-metrics-exposition-formats-1.7.0.jar
+[INFO] Resolved dependency: spring-beans-7.0.9.jar
+[INFO] Resolved dependency: spring-core-7.0.9.jar
+[INFO] Resolved dependency: spring-tx-7.0.9.jar
 [INFO] Resolved dependency: spring-boot-starter-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-test-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-test-autoconfigure-4.1.1.jar
@@ -1725,35 +1727,24 @@
 [INFO] Resolved dependency: mockito-core-5.23.0.jar
 [INFO] Resolved dependency: mockito-junit-jupiter-5.23.0.jar
 [INFO] Resolved dependency: jsonassert-1.5.3.jar
-[INFO] Resolved dependency: spring-core-7.0.9.jar
 [INFO] Resolved dependency: spring-test-7.0.9.jar
 [INFO] Resolved dependency: xmlunit-core-2.11.0.jar
-[INFO] Resolved dependency: profiles-2.55.11.jar
-[INFO] Resolved dependency: spring-beans-7.0.9.jar
-[INFO] Resolved dependency: spring-tx-7.0.9.jar
-[INFO] Resolved dependency: micrometer-core-1.17.1.jar
-[INFO] Resolved dependency: micrometer-observation-1.17.1.jar
-[INFO] Resolved dependency: slf4j-api-2.0.18.jar
-[INFO] Resolved dependency: resilience4j-core-2.4.0.jar
-[INFO] Resolved dependency: smithy-rpcv2-protocol-2.55.11.jar
-[INFO] Resolved dependency: checker-qual-3.55.1.jar
-[INFO] Resolved dependency: spring-boot-starter-jackson-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-tomcat-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-http-converter-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-webmvc-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-starter-micrometer-metrics-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-actuator-autoconfigure-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-health-4.1.1.jar
+[INFO] Resolved dependency: micrometer-observation-1.17.1.jar
 [INFO] Resolved dependency: micrometer-jakarta9-1.17.1.jar
+[INFO] Resolved dependency: smithy-rpcv2-protocol-2.55.11.jar
+[INFO] Resolved dependency: checker-qual-3.55.1.jar
 [INFO] Resolved dependency: aws-xml-protocol-2.55.11.jar
 [INFO] Resolved dependency: arns-2.55.11.jar
 [INFO] Resolved dependency: crt-core-2.55.11.jar
 [INFO] Resolved dependency: checksums-2.55.11.jar
 [INFO] Resolved dependency: checksums-spi-2.55.11.jar
-[INFO] Resolved dependency: jspecify-1.0.1.jar
-[INFO] Resolved dependency: prometheus-metrics-core-1.7.0.jar
-[INFO] Resolved dependency: prometheus-metrics-tracer-common-1.7.0.jar
-[INFO] Resolved dependency: prometheus-metrics-exposition-formats-1.7.0.jar
+[INFO] Resolved dependency: spring-boot-starter-jackson-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-tomcat-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-http-converter-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-webmvc-4.1.1.jar
 [INFO] Resolved dependency: third-party-jackson-core-2.55.11.jar
 [INFO] Resolved dependency: retries-2.55.11.jar
 [INFO] Resolved dependency: reactive-streams-1.0.4.jar
@@ -1771,6 +1762,12 @@
 [INFO] Resolved dependency: netty-handler-4.2.17.Final.jar
 [INFO] Resolved dependency: netty-transport-classes-epoll-4.2.17.Final.jar
 [INFO] Resolved dependency: netty-resolver-4.2.17.Final.jar
+[INFO] Resolved dependency: micrometer-commons-1.17.1.jar
+[INFO] Resolved dependency: HdrHistogram-2.2.2.jar
+[INFO] Resolved dependency: prometheus-metrics-model-1.7.0.jar
+[INFO] Resolved dependency: prometheus-metrics-config-1.7.0.jar
+[INFO] Resolved dependency: prometheus-metrics-exposition-textformats-1.7.0.jar
+[INFO] Resolved dependency: commons-logging-1.3.6.jar
 [INFO] Resolved dependency: spring-boot-starter-logging-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-autoconfigure-4.1.1.jar
 [INFO] Resolved dependency: jakarta.annotation-api-3.0.0.jar
@@ -1785,9 +1782,8 @@
 [INFO] Resolved dependency: byte-buddy-agent-1.18.11.jar
 [INFO] Resolved dependency: objenesis-3.3.jar
 [INFO] Resolved dependency: android-json-0.0.20131108.vaadin1.jar
-[INFO] Resolved dependency: commons-logging-1.3.6.jar
-[INFO] Resolved dependency: micrometer-commons-1.17.1.jar
-[INFO] Resolved dependency: HdrHistogram-2.2.2.jar
+[INFO] Resolved dependency: spring-boot-micrometer-metrics-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-actuator-4.1.1.jar
 [INFO] Resolved dependency: third-party-jackson-dataformat-cbor-2.55.11.jar
 [INFO] Resolved dependency: spring-boot-jackson-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-starter-tomcat-runtime-4.1.1.jar
@@ -1795,11 +1791,6 @@
 [INFO] Resolved dependency: spring-web-7.0.9.jar
 [INFO] Resolved dependency: spring-boot-servlet-4.1.1.jar
 [INFO] Resolved dependency: spring-webmvc-7.0.9.jar
-[INFO] Resolved dependency: spring-boot-micrometer-metrics-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-actuator-4.1.1.jar
-[INFO] Resolved dependency: prometheus-metrics-model-1.7.0.jar
-[INFO] Resolved dependency: prometheus-metrics-config-1.7.0.jar
-[INFO] Resolved dependency: prometheus-metrics-exposition-textformats-1.7.0.jar
 [INFO] Resolved dependency: httpcore5-h2-5.4.3.jar
 [INFO] Resolved dependency: netty-codec-base-4.2.17.Final.jar
 [INFO] Resolved dependency: netty-codec-compression-4.2.17.Final.jar
@@ -1815,6 +1806,7 @@
 [INFO] Resolved dependency: junit-platform-commons-6.0.3.jar
 [INFO] Resolved dependency: apiguardian-api-1.1.2.jar
 [INFO] Resolved dependency: junit-platform-engine-6.0.3.jar
+[INFO] Resolved dependency: spring-boot-micrometer-observation-4.1.1.jar
 [INFO] Resolved dependency: jackson-databind-3.1.5.jar
 [INFO] Resolved dependency: spring-boot-web-server-4.1.1.jar
 [INFO] Resolved dependency: tomcat-embed-core-11.0.24.jar
@@ -1822,14 +1814,13 @@
 [INFO] Resolved dependency: tomcat-embed-websocket-11.0.24.jar
 [INFO] Resolved dependency: spring-aop-7.0.9.jar
 [INFO] Resolved dependency: spring-expression-7.0.9.jar
-[INFO] Resolved dependency: spring-boot-micrometer-observation-4.1.1.jar
 [INFO] Resolved dependency: logback-core-1.5.38.jar
 [INFO] Resolved dependency: log4j-api-2.25.5.jar
 [INFO] Resolved dependency: jackson-annotations-2.21.jar
 [INFO] Resolved dependency: jackson-core-3.1.5.jar
 [INFO] 
 [INFO] ----------------------< pe.axiz:payment-service >-----------------------
-[INFO] Building payment-service 1.0.0                                     [3/5]
+[INFO] Building payment-service 2.0.0                                     [3/4]
 [INFO]   from payment-service/pom.xml
 [INFO] --------------------------------[ jar ]---------------------------------
 [INFO] 
@@ -2655,46 +2646,60 @@
 [INFO]       jaxb-api-2.3.1.jar
 [INFO]       commons-lang3-3.20.0.jar
 [INFO]       commons-io-2.22.0.jar
-[INFO] Resolved dependency: testcontainers-postgresql-2.0.5.jar
-[INFO] Resolved dependency: spring-boot-starter-validation-4.1.1.jar
 [INFO] Resolved dependency: flyway-core-12.4.0.jar
-[INFO] Resolved dependency: spring-boot-starter-webmvc-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-webmvc-4.1.1.jar
-[INFO] Resolved dependency: h2-2.4.240.jar
-[INFO] Resolved dependency: spring-boot-starter-jdbc-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-starter-data-redis-4.1.1.jar
-[INFO] Resolved dependency: flyway-database-postgresql-12.4.0.jar
 [INFO] Resolved dependency: kafka-clients-4.2.1.jar
-[INFO] Resolved dependency: testcontainers-jdbc-2.0.5.jar
-[INFO] Resolved dependency: spring-boot-starter-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-validation-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-webmvc-4.1.1.jar
+[INFO] Resolved dependency: testcontainers-postgresql-2.0.5.jar
+[INFO] Resolved dependency: flyway-database-postgresql-12.4.0.jar
+[INFO] Resolved dependency: spring-boot-starter-jdbc-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-validation-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-webmvc-test-4.1.1.jar
 [INFO] Resolved dependency: jackson-databind-3.1.5.jar
-[INFO] Resolved dependency: spring-boot-starter-jackson-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-webmvc-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-resttestclient-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-jackson-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-tomcat-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-http-converter-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-webmvc-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-jdbc-4.1.1.jar
-[INFO] Resolved dependency: HikariCP-7.0.2.jar
+[INFO] Resolved dependency: spring-boot-starter-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-data-redis-4.1.1.jar
 [INFO] Resolved dependency: spring-messaging-7.0.9.jar
 [INFO] Resolved dependency: zstd-jni-1.5.6-10.jar
 [INFO] Resolved dependency: lz4-java-1.10.1.jar
 [INFO] Resolved dependency: snappy-java-1.1.10.7.jar
 [INFO] Resolved dependency: slf4j-api-2.0.18.jar
-[INFO] Resolved dependency: testcontainers-database-commons-2.0.5.jar
+[INFO] Resolved dependency: spring-boot-starter-jackson-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-tomcat-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-http-converter-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-webmvc-4.1.1.jar
+[INFO] Resolved dependency: testcontainers-jdbc-2.0.5.jar
+[INFO] Resolved dependency: spring-boot-jdbc-4.1.1.jar
+[INFO] Resolved dependency: HikariCP-7.0.2.jar
+[INFO] Resolved dependency: spring-boot-validation-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-jackson-test-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-test-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-webmvc-test-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-resttestclient-4.1.1.jar
+[INFO] Resolved dependency: jackson-annotations-2.21.jar
+[INFO] Resolved dependency: jackson-core-3.1.5.jar
 [INFO] Resolved dependency: spring-boot-starter-logging-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-autoconfigure-4.1.1.jar
 [INFO] Resolved dependency: jakarta.annotation-api-3.0.0.jar
 [INFO] Resolved dependency: snakeyaml-2.6.jar
 [INFO] Resolved dependency: spring-boot-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-data-commons-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-transaction-4.1.1.jar
+[INFO] Resolved dependency: lettuce-core-7.5.2.RELEASE.jar
+[INFO] Resolved dependency: spring-data-redis-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-netty-4.1.1.jar
+[INFO] Resolved dependency: spring-beans-7.0.9.jar
+[INFO] Resolved dependency: spring-core-7.0.9.jar
+[INFO] Resolved dependency: spring-boot-jackson-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-tomcat-runtime-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-tomcat-4.1.1.jar
+[INFO] Resolved dependency: spring-web-7.0.9.jar
+[INFO] Resolved dependency: spring-boot-servlet-4.1.1.jar
+[INFO] Resolved dependency: spring-webmvc-7.0.9.jar
+[INFO] Resolved dependency: testcontainers-database-commons-2.0.5.jar
+[INFO] Resolved dependency: spring-boot-sql-4.1.1.jar
+[INFO] Resolved dependency: spring-jdbc-7.0.9.jar
 [INFO] Resolved dependency: tomcat-embed-el-11.0.24.jar
 [INFO] Resolved dependency: hibernate-validator-9.1.3.Final.jar
-[INFO] Resolved dependency: jackson-annotations-2.21.jar
-[INFO] Resolved dependency: jackson-core-3.1.5.jar
 [INFO] Resolved dependency: spring-boot-test-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-test-autoconfigure-4.1.1.jar
 [INFO] Resolved dependency: json-path-2.10.0.jar
@@ -2707,51 +2712,16 @@
 [INFO] Resolved dependency: mockito-core-5.23.0.jar
 [INFO] Resolved dependency: mockito-junit-jupiter-5.23.0.jar
 [INFO] Resolved dependency: jsonassert-1.5.3.jar
-[INFO] Resolved dependency: spring-core-7.0.9.jar
 [INFO] Resolved dependency: spring-test-7.0.9.jar
 [INFO] Resolved dependency: xmlunit-core-2.11.0.jar
 [INFO] Resolved dependency: spring-boot-web-server-4.1.1.jar
-[INFO] Resolved dependency: spring-web-7.0.9.jar
-[INFO] Resolved dependency: spring-boot-jackson-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-tomcat-runtime-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-tomcat-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-servlet-4.1.1.jar
-[INFO] Resolved dependency: spring-webmvc-7.0.9.jar
-[INFO] Resolved dependency: spring-boot-sql-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-transaction-4.1.1.jar
-[INFO] Resolved dependency: spring-jdbc-7.0.9.jar
-[INFO] Resolved dependency: spring-boot-data-commons-4.1.1.jar
-[INFO] Resolved dependency: lettuce-core-7.5.2.RELEASE.jar
-[INFO] Resolved dependency: spring-data-redis-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-netty-4.1.1.jar
-[INFO] Resolved dependency: spring-beans-7.0.9.jar
-[INFO] Resolved dependency: testcontainers-2.0.5.jar
 [INFO] Resolved dependency: logback-classic-1.5.38.jar
 [INFO] Resolved dependency: log4j-to-slf4j-2.25.5.jar
 [INFO] Resolved dependency: jul-to-slf4j-2.0.18.jar
 [INFO] Resolved dependency: spring-context-7.0.9.jar
-[INFO] Resolved dependency: jakarta.validation-api-3.1.1.jar
-[INFO] Resolved dependency: jboss-logging-3.6.3.Final.jar
-[INFO] Resolved dependency: classmate-1.7.3.jar
-[INFO] Resolved dependency: jakarta.activation-api-2.1.4.jar
-[INFO] Resolved dependency: accessors-smart-2.6.0.jar
-[INFO] Resolved dependency: byte-buddy-1.18.11.jar
-[INFO] Resolved dependency: junit-jupiter-api-6.0.3.jar
-[INFO] Resolved dependency: junit-jupiter-params-6.0.3.jar
-[INFO] Resolved dependency: junit-jupiter-engine-6.0.3.jar
-[INFO] Resolved dependency: byte-buddy-agent-1.18.11.jar
-[INFO] Resolved dependency: objenesis-3.3.jar
-[INFO] Resolved dependency: android-json-0.0.20131108.vaadin1.jar
-[INFO] Resolved dependency: commons-logging-1.3.6.jar
-[INFO] Resolved dependency: jspecify-1.0.1.jar
-[INFO] Resolved dependency: micrometer-observation-1.17.1.jar
-[INFO] Resolved dependency: tomcat-embed-core-11.0.24.jar
-[INFO] Resolved dependency: tomcat-embed-websocket-11.0.24.jar
-[INFO] Resolved dependency: spring-aop-7.0.9.jar
-[INFO] Resolved dependency: spring-expression-7.0.9.jar
 [INFO] Resolved dependency: spring-boot-persistence-4.1.1.jar
-[INFO] Resolved dependency: spring-tx-7.0.9.jar
 [INFO] Resolved dependency: spring-data-commons-4.1.1.jar
+[INFO] Resolved dependency: spring-tx-7.0.9.jar
 [INFO] Resolved dependency: redis-authx-core-0.1.1-beta2.jar
 [INFO] Resolved dependency: netty-common-4.2.17.Final.jar
 [INFO] Resolved dependency: netty-handler-4.2.17.Final.jar
@@ -2760,902 +2730,18 @@
 [INFO] Resolved dependency: netty-resolver-dns-4.2.17.Final.jar
 [INFO] Resolved dependency: spring-data-keyvalue-4.1.1.jar
 [INFO] Resolved dependency: spring-oxm-7.0.9.jar
+[INFO] Resolved dependency: spring-aop-7.0.9.jar
 [INFO] Resolved dependency: spring-context-support-7.0.9.jar
-[INFO] Resolved dependency: commons-compress-1.28.0.jar
-[INFO] Resolved dependency: duct-tape-1.0.8.jar
-[INFO] Resolved dependency: docker-java-api-3.7.1.jar
-[INFO] Resolved dependency: docker-java-transport-zerodep-3.7.1.jar
-[INFO] Resolved dependency: logback-core-1.5.38.jar
-[INFO] Resolved dependency: log4j-api-2.25.5.jar
-[INFO] Resolved dependency: asm-9.7.1.jar
-[INFO] Resolved dependency: opentest4j-1.3.0.jar
-[INFO] Resolved dependency: junit-platform-commons-6.0.3.jar
-[INFO] Resolved dependency: apiguardian-api-1.1.2.jar
-[INFO] Resolved dependency: junit-platform-engine-6.0.3.jar
-[INFO] Resolved dependency: micrometer-commons-1.17.1.jar
-[INFO] Resolved dependency: netty-resolver-4.2.17.Final.jar
-[INFO] Resolved dependency: netty-buffer-4.2.17.Final.jar
-[INFO] Resolved dependency: netty-transport-native-unix-common-4.2.17.Final.jar
-[INFO] Resolved dependency: netty-codec-base-4.2.17.Final.jar
-[INFO] Resolved dependency: reactive-streams-1.0.4.jar
-[INFO] Resolved dependency: netty-codec-dns-4.2.17.Final.jar
-[INFO] Resolved dependency: commons-codec-1.21.0.jar
-[INFO] Resolved dependency: commons-io-2.20.0.jar
-[INFO] Resolved dependency: commons-lang3-3.20.0.jar
-[INFO] Resolved dependency: annotations-17.0.0.jar
-[INFO] Resolved dependency: docker-java-transport-3.7.1.jar
-[INFO] Resolved dependency: jna-5.18.1.jar
-[INFO] 
-[INFO] ----------------------< pe.axiz:acquirer-service >----------------------
-[INFO] Building acquirer-service 1.0.0                                    [4/5]
-[INFO]   from acquirer-service/pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- dependency:3.11.0:go-offline (default-cli) @ acquirer-service ---
-[INFO] Resolved plugin: native-maven-plugin-1.1.8.jar
-[INFO] Resolved plugin dependency:
-[INFO]       native-maven-plugin-1.1.8.jar
-[INFO]       utils-1.1.8.jar
-[INFO]       openjson-1.0.13.jar
-[INFO]       graalvm-reachability-metadata-1.1.8.jar
-[INFO]       cyclonedx-maven-plugin-2.9.1.jar
-[INFO]       mojo-executor-2.4.1.jar
-[INFO]       cyclonedx-core-java-9.0.5.jar
-[INFO]       commons-codec-1.17.1.jar
-[INFO]       commons-lang3-3.17.0.jar
-[INFO]       maven-dependency-tree-3.3.0.jar
-[INFO]       maven-dependency-analyzer-1.14.1.jar
-[INFO]       plexus-utils-3.0.24.jar
-[INFO]       commons-io-2.16.1.jar
-[INFO]       commons-collections4-4.4.jar
-[INFO]       packageurl-java-1.5.0.jar
-[INFO]       jackson-dataformat-xml-2.17.2.jar
-[INFO]       json-schema-validator-1.5.1.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       asm-9.7.jar
-[INFO]       jackson-core-2.17.2.jar
-[INFO]       jackson-annotations-2.17.2.jar
-[INFO]       jackson-databind-2.17.2.jar
-[INFO]       stax2-api-4.2.2.jar
-[INFO]       woodstox-core-6.7.0.jar
-[INFO]       itu-1.10.2.jar
-[INFO]       jackson-dataformat-yaml-2.17.1.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       snakeyaml-2.2.jar
-[INFO] Resolved plugin: kotlin-maven-plugin-2.3.21.jar
-[INFO] Resolved plugin dependency:
-[INFO]       kotlin-maven-plugin-2.3.21.jar
-[INFO]       maven-plugin-annotations-3.7.0.jar
-[INFO]       kotlin-build-tools-api-2.3.21.jar
-[INFO]       kotlin-build-tools-impl-2.3.21.jar
-[INFO]       kotlin-compiler-embeddable-2.3.21.jar
-[INFO]       kotlin-scripting-compiler-embeddable-2.3.21.jar
-[INFO]       maven-compiler-plugin-3.14.0.jar
-[INFO]       javax.inject-1.jar
-[INFO]       guava-33.5.0-jre.jar
-[INFO]       annotations-26.0.2-1.jar
-[INFO]       kotlin-stdlib-2.3.21.jar
-[INFO]       kotlin-build-tools-cri-impl-2.3.21.jar
-[INFO]       kotlin-compiler-runner-2.3.21.jar
-[INFO]       kotlin-script-runtime-2.3.21.jar
-[INFO]       kotlin-reflect-1.6.10.jar
-[INFO]       kotlin-daemon-embeddable-2.3.21.jar
-[INFO]       kotlinx-coroutines-core-jvm-1.8.0.jar
-[INFO]       kotlin-scripting-common-2.3.21.jar
-[INFO]       kotlin-scripting-jvm-2.3.21.jar
-[INFO]       kotlin-scripting-compiler-impl-embeddable-2.3.21.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       maven-shared-incremental-1.1.jar
-[INFO]       plexus-java-1.4.0.jar
-[INFO]       plexus-compiler-api-2.15.0.jar
-[INFO]       plexus-compiler-manager-2.15.0.jar
-[INFO]       plexus-compiler-javac-2.15.0.jar
-[INFO]       plexus-utils-4.0.1.jar
-[INFO]       failureaccess-1.0.3.jar
-[INFO]       listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar
-[INFO]       jspecify-1.0.0.jar
-[INFO]       error_prone_annotations-2.41.0.jar
-[INFO]       j2objc-annotations-3.1.jar
-[INFO]       kotlin-daemon-client-2.3.21.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       commons-io-2.18.0.jar
-[INFO]       asm-9.7.1.jar
-[INFO]       qdox-2.2.0.jar
-[INFO]       plexus-xml-3.0.0.jar
-[INFO] Resolved plugin: build-helper-maven-plugin-3.6.1.jar
-[INFO] Resolved plugin dependency:
-[INFO]       build-helper-maven-plugin-3.6.1.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       bsh-2.0b6.jar
-[INFO]       file-management-3.2.0.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       commons-io-2.19.0.jar
-[INFO] Resolved plugin: maven-site-plugin-3.22.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-site-plugin-3.22.0.jar
-[INFO]       maven-reporting-api-4.0.0.jar
-[INFO]       maven-reporting-exec-2.0.1.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       maven-resolver-transport-wagon-1.4.1.jar
-[INFO]       maven-archiver-3.6.6.jar
-[INFO]       plexus-archiver-4.11.0.jar
-[INFO]       commons-io-2.22.0.jar
-[INFO]       plexus-i18n-1.1.0.jar
-[INFO]       plexus-interactivity-api-1.5.1.jar
-[INFO]       plexus-utils-4.0.3.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       doxia-sink-api-2.1.0.jar
-[INFO]       doxia-core-2.1.0.jar
-[INFO]       doxia-module-xhtml5-2.1.0.jar
-[INFO]       doxia-module-apt-2.1.0.jar
-[INFO]       doxia-module-xdoc-2.1.0.jar
-[INFO]       doxia-module-fml-2.1.0.jar
-[INFO]       doxia-module-markdown-2.1.0.jar
-[INFO]       doxia-site-model-2.1.0.jar
-[INFO]       doxia-site-renderer-2.1.0.jar
-[INFO]       doxia-integration-tools-2.1.0.jar
-[INFO]       commons-lang3-3.20.0.jar
-[INFO]       jetty-server-9.4.58.v20250814.jar
-[INFO]       jetty-http-9.4.58.v20250814.jar
-[INFO]       jetty-servlet-9.4.58.v20250814.jar
-[INFO]       jetty-webapp-9.4.58.v20250814.jar
-[INFO]       jetty-util-9.4.58.v20250814.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       javax.inject-1.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       plexus-classworlds-2.9.0.jar
-[INFO]       maven-resolver-spi-1.4.1.jar
-[INFO]       wagon-provider-api-3.0.0.jar
-[INFO]       plexus-interpolation-1.29.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       xz-1.11.jar
-[INFO]       zstd-jni-1.5.7-6.jar
-[INFO]       flexmark-0.62.2.jar
-[INFO]       flexmark-util-data-0.62.2.jar
-[INFO]       flexmark-util-misc-0.62.2.jar
-[INFO]       flexmark-util-sequence-0.62.2.jar
-[INFO]       flexmark-util-ast-0.62.2.jar
-[INFO]       flexmark-ext-abbreviation-0.62.2.jar
-[INFO]       flexmark-ext-autolink-0.62.2.jar
-[INFO]       flexmark-ext-definition-0.62.2.jar
-[INFO]       flexmark-ext-escaped-character-0.62.2.jar
-[INFO]       flexmark-ext-footnotes-0.62.2.jar
-[INFO]       flexmark-ext-gfm-strikethrough-0.62.2.jar
-[INFO]       flexmark-ext-tables-0.62.2.jar
-[INFO]       flexmark-ext-typographic-0.62.2.jar
-[INFO]       flexmark-ext-wikilink-0.62.2.jar
-[INFO]       flexmark-ext-yaml-front-matter-0.62.2.jar
-[INFO]       jsoup-1.22.1.jar
-[INFO]       annotations-26.1.0.jar
-[INFO]       org.eclipse.sisu.plexus-1.0.0.jar
-[INFO]       doxia-skin-model-2.1.0.jar
-[INFO]       plexus-velocity-2.3.0.jar
-[INFO]       velocity-engine-core-2.4.1.jar
-[INFO]       velocity-tools-generic-3.1.jar
-[INFO]       javax.servlet-api-3.1.0.jar
-[INFO]       jetty-io-9.4.58.v20250814.jar
-[INFO]       jetty-security-9.4.58.v20250814.jar
-[INFO]       jetty-util-ajax-9.4.58.v20250814.jar
-[INFO]       jetty-xml-9.4.58.v20250814.jar
-[INFO]       commons-codec-1.19.0.jar
-[INFO]       flexmark-util-builder-0.62.2.jar
-[INFO]       flexmark-util-collection-0.62.2.jar
-[INFO]       flexmark-util-dependency-0.62.2.jar
-[INFO]       flexmark-util-format-0.62.2.jar
-[INFO]       flexmark-util-html-0.62.2.jar
-[INFO]       flexmark-util-visitor-0.62.2.jar
-[INFO]       flexmark-util-0.62.2.jar
-[INFO]       autolink-0.6.0.jar
-[INFO]       org.eclipse.sisu.inject-1.0.0.jar
-[INFO]       plexus-component-annotations-2.2.0.jar
-[INFO]       commons-beanutils-1.9.4.jar
-[INFO]       commons-digester3-3.2.jar
-[INFO]       json-simple-3.0.2.jar
-[INFO]       flexmark-util-options-0.62.2.jar
-[INFO]       asm-9.9.1.jar
-[INFO]       commons-logging-1.2.jar
-[INFO]       commons-collections-3.2.2.jar
-[INFO] Resolved plugin: maven-source-plugin-3.4.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-source-plugin-3.4.0.jar
-[INFO]       maven-archiver-3.6.5.jar
-[INFO]       plexus-archiver-4.10.4.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-interpolation-1.28.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       javax.inject-1.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       aircompressor-0.27.jar
-[INFO]       xz-1.10.jar
-[INFO]       zstd-jni-1.5.7-6.jar
-[INFO]       commons-io-2.21.0.jar
-[INFO]       commons-codec-1.19.0.jar
-[INFO]       commons-lang3-3.18.0.jar
-[INFO] Resolved plugin: flyway-maven-plugin-12.4.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       flyway-maven-plugin-12.4.0.jar
-[INFO]       flyway-database-postgresql-12.4.0.jar
-[INFO]       postgresql-42.7.13.jar
-[INFO]       flyway-core-12.4.0.jar
-[INFO]       jackson-dataformat-toml-3.1.1.jar
-[INFO]       commons-text-1.10.0.jar
-[INFO]       checker-qual-3.55.1.jar
-[INFO]       jackson-databind-3.1.1.jar
-[INFO]       jackson-core-3.1.1.jar
-[INFO]       commons-lang3-3.18.0.jar
-[INFO]       jackson-annotations-2.21.jar
-[INFO] Resolved plugin: maven-antrun-plugin-3.2.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-antrun-plugin-3.2.0.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       ant-1.10.15.jar
-[INFO]       ant-launcher-1.10.15.jar
-[INFO] Resolved plugin: maven-compiler-plugin-3.15.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-compiler-plugin-3.15.0.jar
-[INFO]       asm-9.9.1.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       maven-shared-incremental-1.1.jar
-[INFO]       plexus-java-1.5.2.jar
-[INFO]       plexus-compiler-api-2.16.2.jar
-[INFO]       plexus-compiler-manager-2.16.2.jar
-[INFO]       plexus-compiler-javac-2.16.2.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       commons-io-2.11.0.jar
-[INFO]       qdox-2.2.0.jar
-[INFO]       javax.inject-1.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO] Resolved plugin: maven-surefire-plugin-3.5.6.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-surefire-plugin-3.5.6.jar
-[INFO]       surefire-api-3.5.6.jar
-[INFO]       surefire-extensions-api-3.5.6.jar
-[INFO]       maven-surefire-common-3.5.6.jar
-[INFO]       surefire-logger-api-3.5.6.jar
-[INFO]       surefire-shared-utils-3.5.6.jar
-[INFO]       surefire-booter-3.5.6.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       plexus-java-1.5.2.jar
-[INFO]       surefire-extensions-spi-3.5.6.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       asm-9.9.1.jar
-[INFO]       qdox-2.2.0.jar
-[INFO] Resolved plugin: maven-jar-plugin-3.5.1.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-jar-plugin-3.5.1.jar
-[INFO]       file-management-3.2.0.jar
-[INFO]       maven-archiver-3.6.6.jar
-[INFO]       plexus-archiver-4.12.0.jar
-[INFO]       javax.inject-1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       commons-io-2.22.0.jar
-[INFO]       plexus-utils-4.0.3.jar
-[INFO]       plexus-interpolation-1.29.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       xz-1.12.jar
-[INFO]       zstd-jni-1.5.7-9.jar
-[INFO]       commons-codec-1.19.0.jar
-[INFO]       commons-lang3-3.18.0.jar
-[INFO] Resolved plugin: maven-help-plugin-3.5.2.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-help-plugin-3.5.2.jar
-[INFO]       javax.inject-1.jar
-[INFO]       maven-plugin-tools-generators-3.15.2.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       maven-reporting-api-4.0.0.jar
-[INFO]       plexus-interactivity-api-1.5.1.jar
-[INFO]       plexus-utils-4.0.3.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       jdom2-2.0.6.1.jar
-[INFO]       xstream-1.4.21.jar
-[INFO]       jsoup-1.19.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       mxparser-1.2.2.jar
-[INFO]       xmlpull-1.1.3.1.jar
-[INFO] Resolved plugin: maven-failsafe-plugin-3.5.6.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-failsafe-plugin-3.5.6.jar
-[INFO]       surefire-api-3.5.6.jar
-[INFO]       surefire-booter-3.5.6.jar
-[INFO]       surefire-extensions-api-3.5.6.jar
-[INFO]       surefire-shared-utils-3.5.6.jar
-[INFO]       maven-surefire-common-3.5.6.jar
-[INFO]       surefire-logger-api-3.5.6.jar
-[INFO]       surefire-extensions-spi-3.5.6.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       plexus-java-1.5.2.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       asm-9.9.1.jar
-[INFO]       qdox-2.2.0.jar
-[INFO] Resolved plugin: maven-shade-plugin-3.6.2.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-shade-plugin-3.6.2.jar
-[INFO]       spring-boot-maven-plugin-4.1.1.jar
-[INFO]       asm-9.9.1.jar
-[INFO]       asm-commons-9.9.1.jar
-[INFO]       jdom2-2.0.6.1.jar
-[INFO]       jdependency-2.15.jar
-[INFO]       plexus-utils-3.6.0.jar
-[INFO]       spring-boot-buildpack-platform-4.1.1.jar
-[INFO]       spring-boot-loader-tools-4.1.1.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       spring-core-7.0.9.jar
-[INFO]       spring-context-7.0.9.jar
-[INFO]       asm-tree-9.9.1.jar
-[INFO]       jna-platform-5.17.0.jar
-[INFO]       commons-compress-1.27.1.jar
-[INFO]       httpclient5-5.6.4.jar
-[INFO]       tomlj-1.0.0.jar
-[INFO]       jackson-databind-3.1.5.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       commons-logging-1.3.5.jar
-[INFO]       jspecify-1.0.0.jar
-[INFO]       spring-aop-7.0.9.jar
-[INFO]       spring-beans-7.0.9.jar
-[INFO]       spring-expression-7.0.9.jar
-[INFO]       micrometer-observation-1.16.7.jar
-[INFO]       jna-5.17.0.jar
-[INFO]       commons-codec-1.17.1.jar
-[INFO]       commons-io-2.16.1.jar
-[INFO]       commons-lang3-3.16.0.jar
-[INFO]       httpcore5-5.4.3.jar
-[INFO]       httpcore5-h2-5.4.3.jar
-[INFO]       antlr4-runtime-4.7.2.jar
-[INFO]       jsr305-3.0.2.jar
-[INFO]       jackson-annotations-2.21.jar
-[INFO]       jackson-core-3.1.5.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       micrometer-commons-1.16.7.jar
-[INFO] Resolved plugin: maven-install-plugin-3.1.4.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-install-plugin-3.1.4.jar
-[INFO]       maven-resolver-util-1.9.22.jar
-[INFO]       plexus-utils-4.0.1.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       maven-resolver-api-1.9.22.jar
-[INFO] Resolved plugin: spring-boot-maven-plugin-4.1.1.jar
-[INFO] Resolved plugin dependency:
-[INFO]       spring-boot-maven-plugin-4.1.1.jar
-[INFO]       spring-boot-buildpack-platform-4.1.1.jar
-[INFO]       spring-boot-loader-tools-4.1.1.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       spring-core-7.0.9.jar
-[INFO]       spring-context-7.0.9.jar
-[INFO]       maven-shade-plugin-3.6.0.jar
-[INFO]       jna-platform-5.17.0.jar
-[INFO]       commons-compress-1.27.1.jar
-[INFO]       httpclient5-5.6.4.jar
-[INFO]       tomlj-1.0.0.jar
-[INFO]       jackson-databind-3.1.5.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       commons-logging-1.3.5.jar
-[INFO]       jspecify-1.0.0.jar
-[INFO]       spring-aop-7.0.9.jar
-[INFO]       spring-beans-7.0.9.jar
-[INFO]       spring-expression-7.0.9.jar
-[INFO]       micrometer-observation-1.16.7.jar
-[INFO]       plexus-utils-3.5.1.jar
-[INFO]       asm-9.7.jar
-[INFO]       asm-commons-9.7.jar
-[INFO]       jdom2-2.0.6.1.jar
-[INFO]       commons-io-2.16.1.jar
-[INFO]       jdependency-2.10.jar
-[INFO]       jna-5.17.0.jar
-[INFO]       commons-codec-1.17.1.jar
-[INFO]       commons-lang3-3.16.0.jar
-[INFO]       httpcore5-5.4.3.jar
-[INFO]       httpcore5-h2-5.4.3.jar
-[INFO]       antlr4-runtime-4.7.2.jar
-[INFO]       jsr305-3.0.2.jar
-[INFO]       jackson-annotations-2.21.jar
-[INFO]       jackson-core-3.1.5.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       micrometer-commons-1.16.7.jar
-[INFO]       asm-tree-9.7.jar
-[INFO] Resolved plugin: maven-deploy-plugin-3.1.4.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-deploy-plugin-3.1.4.jar
-[INFO]       plexus-utils-4.0.1.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       maven-resolver-util-1.9.22.jar
-[INFO]       maven-resolver-api-1.9.22.jar
-[INFO] Resolved plugin: versions-maven-plugin-2.21.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       versions-maven-plugin-2.21.0.jar
-[INFO]       versions-api-2.21.0.jar
-[INFO]       versions-model-2.21.0.jar
-[INFO]       versions-model-report-2.21.0.jar
-[INFO]       versions-common-2.21.0.jar
-[INFO]       wagon-provider-api-3.5.3.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       maven-reporting-api-4.0.0.jar
-[INFO]       maven-reporting-impl-4.0.0.jar
-[INFO]       doxia-core-2.0.0.jar
-[INFO]       doxia-sink-api-2.0.0.jar
-[INFO]       plexus-i18n-1.1.0.jar
-[INFO]       plexus-interactivity-api-1.5.1.jar
-[INFO]       woodstox-core-7.1.1.jar
-[INFO]       commons-lang3-3.20.0.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       commons-collections4-4.5.0.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       doxia-site-model-2.0.0.jar
-[INFO]       doxia-integration-tools-2.0.0.jar
-[INFO]       doxia-site-renderer-2.0.0.jar
-[INFO]       doxia-module-apt-2.0.0.jar
-[INFO]       doxia-module-xdoc-2.0.0.jar
-[INFO]       maven-archiver-3.6.2.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       org.eclipse.sisu.plexus-0.3.4.jar
-[INFO]       javax.inject-1.jar
-[INFO]       commons-io-2.21.0.jar
-[INFO]       commons-text-1.15.0.jar
-[INFO]       stax2-api-4.2.2.jar
-[INFO]       plexus-interpolation-1.27.jar
-[INFO]       doxia-skin-model-2.0.0.jar
-[INFO]       doxia-module-xhtml5-2.0.0.jar
-[INFO]       plexus-velocity-2.2.0.jar
-[INFO]       velocity-engine-core-2.4.jar
-[INFO]       velocity-tools-generic-3.1.jar
-[INFO]       plexus-archiver-4.11.0.jar
-[INFO]       cdi-api-1.0.jar
-[INFO]       org.eclipse.sisu.inject-0.3.4.jar
-[INFO]       plexus-component-annotations-1.5.5.jar
-[INFO]       plexus-classworlds-2.5.2.jar
-[INFO]       commons-beanutils-1.11.0.jar
-[INFO]       commons-digester3-3.2.jar
-[INFO]       json-simple-3.0.2.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       xz-1.11.jar
-[INFO]       zstd-jni-1.5.7-6.jar
-[INFO]       jsr250-api-1.0.jar
-[INFO]       commons-logging-1.3.5.jar
-[INFO]       commons-collections-3.2.2.jar
-[INFO]       commons-codec-1.20.0.jar
-[INFO] Resolved plugin: xml-maven-plugin-1.2.1.jar
-[INFO] Resolved plugin dependency:
-[INFO]       xml-maven-plugin-1.2.1.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-resources-1.3.1.jar
-[INFO]       xml-resolver-1.2.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       javax.inject-1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       commons-io-2.21.0.jar
-[INFO] Resolved plugin: maven-enforcer-plugin-3.6.3.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-enforcer-plugin-3.6.3.jar
-[INFO]       plexus-utils-4.0.3.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       enforcer-api-3.6.3.jar
-[INFO]       enforcer-rules-3.6.3.jar
-[INFO]       maven-resolver-util-1.9.27.jar
-[INFO]       commons-lang3-3.20.0.jar
-[INFO]       commons-codec-1.22.0.jar
-[INFO]       commons-io-2.22.0.jar
-[INFO]       bsh-2.0b6.jar
-[INFO]       maven-resolver-api-1.9.27.jar
-[INFO] Resolved plugin: maven-war-plugin-3.5.1.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-war-plugin-3.5.1.jar
-[INFO]       maven-archiver-3.6.5.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       commons-io-2.21.0.jar
-[INFO]       plexus-archiver-4.10.4.jar
-[INFO]       plexus-interpolation-1.29.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       maven-filtering-3.4.0.jar
-[INFO]       maven-mapping-3.0.0.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       javax.inject-1.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       aircompressor-0.27.jar
-[INFO]       xz-1.10.jar
-[INFO]       zstd-jni-1.5.7-6.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       commons-lang3-3.20.0.jar
-[INFO]       maven-core-3.9.11.jar
-[INFO]       commons-codec-1.19.0.jar
-[INFO]       maven-model-3.9.11.jar
-[INFO]       maven-settings-3.9.11.jar
-[INFO]       maven-settings-builder-3.9.11.jar
-[INFO]       maven-builder-support-3.9.11.jar
-[INFO]       maven-repository-metadata-3.9.11.jar
-[INFO]       maven-artifact-3.9.11.jar
-[INFO]       maven-plugin-api-3.9.11.jar
-[INFO]       maven-model-builder-3.9.11.jar
-[INFO]       maven-resolver-provider-3.9.11.jar
-[INFO]       maven-resolver-impl-1.9.24.jar
-[INFO]       maven-resolver-api-1.9.24.jar
-[INFO]       maven-resolver-spi-1.9.24.jar
-[INFO]       maven-resolver-util-1.9.24.jar
-[INFO]       org.eclipse.sisu.plexus-0.9.0.M4.jar
-[INFO]       org.eclipse.sisu.inject-0.9.0.M4.jar
-[INFO]       asm-9.8.jar
-[INFO]       guice-5.1.0-classes.jar
-[INFO]       guava-33.4.8-jre.jar
-[INFO]       failureaccess-1.0.3.jar
-[INFO]       plexus-classworlds-2.9.0.jar
-[INFO]       plexus-component-annotations-2.2.0.jar
-[INFO]       plexus-sec-dispatcher-2.0.jar
-[INFO]       maven-resolver-named-locks-1.9.24.jar
-[INFO]       aopalliance-1.0.jar
-[INFO]       jspecify-1.0.0.jar
-[INFO]       plexus-cipher-2.0.jar
-[INFO] Resolved plugin: maven-javadoc-plugin-3.12.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-javadoc-plugin-3.12.0.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       javax.inject-1.jar
-[INFO]       maven-reporting-api-4.0.0.jar
-[INFO]       maven-archiver-3.6.4.jar
-[INFO]       maven-invoker-3.3.0.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       doxia-sink-api-2.0.0.jar
-[INFO]       doxia-site-renderer-2.0.0.jar
-[INFO]       doxia-integration-tools-2.0.0.jar
-[INFO]       wagon-provider-api-3.5.3.jar
-[INFO]       commons-lang3-3.18.0.jar
-[INFO]       commons-text-1.14.0.jar
-[INFO]       httpclient-4.5.14.jar
-[INFO]       httpcore-4.4.16.jar
-[INFO]       qdox-2.2.0.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       plexus-java-1.5.0.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       plexus-io-3.5.1.jar
-[INFO]       plexus-archiver-4.10.0.jar
-[INFO]       commons-io-2.20.0.jar
-[INFO]       plexus-interactivity-api-1.4.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       plexus-interpolation-1.28.jar
-[INFO]       doxia-core-2.0.0.jar
-[INFO]       doxia-site-model-2.0.0.jar
-[INFO]       doxia-skin-model-2.0.0.jar
-[INFO]       doxia-module-xhtml5-2.0.0.jar
-[INFO]       org.eclipse.sisu.plexus-0.9.0.M4.jar
-[INFO]       plexus-velocity-2.2.0.jar
-[INFO]       velocity-engine-core-2.4.jar
-[INFO]       velocity-tools-generic-3.1.jar
-[INFO]       plexus-i18n-1.0-beta-10.jar
-[INFO]       commons-logging-1.2.jar
-[INFO]       commons-codec-1.11.jar
-[INFO]       asm-9.8.jar
-[INFO]       commons-compress-1.26.2.jar
-[INFO]       aircompressor-0.27.jar
-[INFO]       xz-1.9.jar
-[INFO]       zstd-jni-1.5.6-3.jar
-[INFO]       org.eclipse.sisu.inject-0.9.0.M4.jar
-[INFO]       plexus-component-annotations-2.1.0.jar
-[INFO]       plexus-classworlds-2.6.0.jar
-[INFO]       commons-beanutils-1.9.4.jar
-[INFO]       commons-digester3-3.2.jar
-[INFO]       json-simple-3.0.2.jar
-[INFO]       commons-collections-3.2.2.jar
-[INFO] Resolved plugin: maven-resources-plugin-3.5.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-resources-plugin-3.5.0.jar
-[INFO]       maven-filtering-3.5.0.jar
-[INFO]       plexus-utils-3.6.0.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       plexus-build-api-1.2.0.jar
-[INFO]       plexus-interpolation-1.29.jar
-[INFO]       javax.inject-1.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       org.eclipse.sisu.plexus-0.9.0.M4.jar
-[INFO] Resolved plugin: maven-assembly-plugin-3.8.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-assembly-plugin-3.8.0.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       plexus-interpolation-1.29.jar
-[INFO]       commons-io-2.21.0.jar
-[INFO]       maven-filtering-3.4.0.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       plexus-archiver-4.10.4.jar
-[INFO]       maven-archiver-3.6.5.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       javax.inject-1.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       commons-lang3-3.20.0.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       aircompressor-0.27.jar
-[INFO]       xz-1.10.jar
-[INFO]       zstd-jni-1.5.7-6.jar
-[INFO]       commons-codec-1.19.0.jar
-[INFO] Resolved plugin: jooq-codegen-maven-3.21.7.jar
-[INFO] Resolved plugin dependency:
-[INFO]       jooq-codegen-maven-3.21.7.jar
-[INFO]       jooq-codegen-3.21.7.jar
-[INFO]       jooq-3.21.7.jar
-[INFO]       jooq-meta-3.21.7.jar
-[INFO]       r2dbc-spi-1.0.0.RELEASE.jar
-[INFO]       jakarta.xml.bind-api-4.0.2.jar
-[INFO]       reactive-streams-1.0.3.jar
-[INFO]       jakarta.activation-api-2.1.3.jar
-[INFO] Resolved plugin: spotless-maven-plugin-3.0.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       spotless-maven-plugin-3.0.0.jar
-[INFO]       spotless-lib-4.0.0.jar
-[INFO]       spotless-lib-extra-4.0.0.jar
-[INFO]       durian-core-1.2.0.jar
-[INFO]       durian-io-1.2.0.jar
-[INFO]       durian-collect-1.2.0.jar
-[INFO]       plexus-resources-1.3.1.jar
-[INFO]       org.eclipse.jgit-7.3.0.202506031305-r.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       concurrent-trees-2.6.1.jar
-[INFO]       solstice-1.8.1.jar
-[INFO]       org.eclipse.osgi-3.23.200.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       javax.inject-1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       JavaEWAH-1.2.3.jar
-[INFO]       commons-codec-1.18.0.jar
-[INFO]       durian-swt.os-4.3.0.jar
-[INFO]       xz-1.9.jar
-[INFO]       okhttp-4.12.0.jar
-[INFO]       okio-3.6.0.jar
-[INFO]       kotlin-stdlib-jdk8-1.8.21.jar
-[INFO]       okio-jvm-3.6.0.jar
-[INFO]       kotlin-stdlib-1.8.21.jar
-[INFO]       kotlin-stdlib-jdk7-1.8.21.jar
-[INFO]       kotlin-stdlib-common-1.9.10.jar
-[INFO]       annotations-13.0.jar
-[INFO] Resolved plugin: maven-clean-plugin-3.5.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-clean-plugin-3.5.0.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO] Resolved plugin: protobuf-maven-plugin-5.1.8.jar
-[INFO] Resolved plugin dependency:
-[INFO]       protobuf-maven-plugin-5.1.8.jar
-[INFO]       protobuf-java-4.35.1.jar
-[INFO]       javax.annotation-api-1.3.2.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       json-20260719.jar
-[INFO]       jspecify-1.0.1.jar
-[INFO]       commons-codec-1.19.0.jar
-[INFO]       commons-io-2.20.0.jar
-[INFO]       commons-lang3-3.18.0.jar
-[INFO] Resolved plugin: git-commit-id-maven-plugin-9.2.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       git-commit-id-maven-plugin-9.2.0.jar
-[INFO]       git-commit-id-plugin-core-6.2.0.jar
-[INFO]       plexus-build-api-1.2.0.jar
-[INFO]       jspecify-1.0.0.jar
-[INFO]       org.eclipse.jgit-6.10.1.202505221210-r.jar
-[INFO]       org.eclipse.jgit.ssh.apache-6.10.1.202505221210-r.jar
-[INFO]       bcpkix-jdk18on-1.81.jar
-[INFO]       java-ordered-properties-1.0.4.jar
-[INFO]       jakarta.json-api-2.1.3.jar
-[INFO]       parsson-1.1.7.jar
-[INFO]       snakeyaml-2.6.jar
-[INFO]       plexus-utils-4.0.0.jar
-[INFO]       javax.inject-1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       org.eclipse.sisu.plexus-0.9.0.M2.jar
-[INFO]       JavaEWAH-1.2.3.jar
-[INFO]       commons-codec-1.17.0.jar
-[INFO]       sshd-osgi-2.14.0.jar
-[INFO]       sshd-sftp-2.14.0.jar
-[INFO]       eddsa-0.3.0.jar
-[INFO]       bcutil-jdk18on-1.81.1.jar
-[INFO]       jcl-over-slf4j-1.7.36.jar
-[INFO]       bcprov-jdk18on-1.81.1.jar
-[INFO] Resolved plugin: maven-dependency-plugin-3.10.0.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-dependency-plugin-3.10.0.jar
-[INFO]       doxia-sink-api-2.0.0.jar
-[INFO]       maven-reporting-api-4.0.0.jar
-[INFO]       maven-reporting-impl-4.0.0.jar
-[INFO]       plexus-archiver-4.11.0.jar
-[INFO]       commons-lang3-3.20.0.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       plexus-io-3.6.0.jar
-[INFO]       plexus-i18n-1.1.0.jar
-[INFO]       maven-dependency-analyzer-1.17.0.jar
-[INFO]       maven-dependency-tree-3.3.0.jar
-[INFO]       maven-common-artifact-filters-3.4.0.jar
-[INFO]       maven-artifact-transfer-0.13.1.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       maven-resolver-util-1.9.25.jar
-[INFO]       plexus-build-api-0.0.7.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       velocity-engine-core-2.4.1.jar
-[INFO]       velocity-tools-generic-3.1.jar
-[INFO]       doxia-site-model-2.0.0.jar
-[INFO]       doxia-core-2.0.0.jar
-[INFO]       doxia-integration-tools-2.0.0.jar
-[INFO]       doxia-site-renderer-2.0.0.jar
-[INFO]       doxia-module-apt-2.0.0.jar
-[INFO]       doxia-module-xdoc-2.0.0.jar
-[INFO]       maven-archiver-3.6.2.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       org.eclipse.sisu.plexus-0.9.0.M4.jar
-[INFO]       javax.inject-1.jar
-[INFO]       commons-compress-1.28.0.jar
-[INFO]       commons-io-2.21.0.jar
-[INFO]       xz-1.11.jar
-[INFO]       zstd-jni-1.5.7-6.jar
-[INFO]       asm-9.9.1.jar
-[INFO]       plexus-component-annotations-2.0.0.jar
-[INFO]       commons-beanutils-1.9.4.jar
-[INFO]       commons-digester3-3.2.jar
-[INFO]       json-simple-3.0.2.jar
-[INFO]       commons-text-1.12.0.jar
-[INFO]       plexus-interpolation-1.27.jar
-[INFO]       doxia-skin-model-2.0.0.jar
-[INFO]       doxia-module-xhtml5-2.0.0.jar
-[INFO]       plexus-velocity-2.2.0.jar
-[INFO]       org.eclipse.sisu.inject-0.9.0.M4.jar
-[INFO]       plexus-classworlds-2.6.0.jar
-[INFO]       commons-codec-1.19.0.jar
-[INFO]       commons-logging-1.2.jar
-[INFO]       commons-collections-3.2.2.jar
-[INFO] Resolved plugin: maven-invoker-plugin-3.9.1.jar
-[INFO] Resolved plugin dependency:
-[INFO]       maven-invoker-plugin-3.9.1.jar
-[INFO]       maven-invoker-3.3.0.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       maven-reporting-api-4.0.0.jar
-[INFO]       maven-reporting-impl-4.0.0.jar
-[INFO]       doxia-sink-api-2.0.0.jar
-[INFO]       maven-script-interpreter-1.6.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       bsh-2.0b6.jar
-[INFO]       groovy-4.0.27.jar
-[INFO]       groovy-json-4.0.27.jar
-[INFO]       groovy-xml-4.0.27.jar
-[INFO]       plexus-utils-4.0.2.jar
-[INFO]       plexus-xml-3.0.1.jar
-[INFO]       plexus-interpolation-1.28.jar
-[INFO]       plexus-i18n-1.0-beta-10.jar
-[INFO]       maven-shared-utils-3.4.2.jar
-[INFO]       javax.inject-1.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       doxia-site-model-2.0.0.jar
-[INFO]       doxia-core-2.0.0.jar
-[INFO]       doxia-integration-tools-2.0.0.jar
-[INFO]       doxia-site-renderer-2.0.0.jar
-[INFO]       doxia-module-apt-2.0.0.jar
-[INFO]       doxia-module-xdoc-2.0.0.jar
-[INFO]       maven-archiver-3.6.2.jar
-[INFO]       org.eclipse.sisu.plexus-0.9.0.M4.jar
-[INFO]       commons-io-2.19.0.jar
-[INFO]       commons-text-1.12.0.jar
-[INFO]       commons-lang3-3.17.0.jar
-[INFO]       doxia-skin-model-2.0.0.jar
-[INFO]       doxia-module-xhtml5-2.0.0.jar
-[INFO]       plexus-velocity-2.2.0.jar
-[INFO]       velocity-engine-core-2.4.jar
-[INFO]       velocity-tools-generic-3.1.jar
-[INFO]       plexus-archiver-4.9.2.jar
-[INFO]       org.eclipse.sisu.inject-0.9.0.M4.jar
-[INFO]       plexus-component-annotations-2.1.0.jar
-[INFO]       plexus-classworlds-2.6.0.jar
-[INFO]       commons-beanutils-1.11.0.jar
-[INFO]       commons-digester3-3.2.jar
-[INFO]       json-simple-3.0.2.jar
-[INFO]       plexus-io-3.4.2.jar
-[INFO]       commons-compress-1.26.1.jar
-[INFO]       commons-codec-1.18.0.jar
-[INFO]       snappy-0.4.jar
-[INFO]       xz-1.9.jar
-[INFO]       zstd-jni-1.5.5-11.jar
-[INFO]       asm-9.8.jar
-[INFO]       commons-logging-1.3.5.jar
-[INFO]       commons-collections-3.2.2.jar
-[INFO] Resolved plugin: cyclonedx-maven-plugin-2.9.3.jar
-[INFO] Resolved plugin dependency:
-[INFO]       cyclonedx-maven-plugin-2.9.3.jar
-[INFO]       cyclonedx-core-java-9.0.5.jar
-[INFO]       commons-codec-1.22.0.jar
-[INFO]       commons-lang3-3.19.0.jar
-[INFO]       maven-dependency-tree-3.3.0.jar
-[INFO]       maven-dependency-analyzer-1.17.1.jar
-[INFO]       commons-io-2.16.1.jar
-[INFO]       commons-collections4-4.4.jar
-[INFO]       packageurl-java-1.5.0.jar
-[INFO]       jackson-dataformat-xml-2.17.2.jar
-[INFO]       json-schema-validator-1.5.1.jar
-[INFO]       maven-resolver-util-1.4.1.jar
-[INFO]       slf4j-api-1.7.36.jar
-[INFO]       asm-9.9.1.jar
-[INFO]       jackson-core-2.17.2.jar
-[INFO]       jackson-annotations-2.17.2.jar
-[INFO]       jackson-databind-2.17.2.jar
-[INFO]       stax2-api-4.2.2.jar
-[INFO]       woodstox-core-6.7.0.jar
-[INFO]       itu-1.10.2.jar
-[INFO]       jackson-dataformat-yaml-2.17.1.jar
-[INFO]       maven-resolver-api-1.4.1.jar
-[INFO]       snakeyaml-2.2.jar
-[INFO] Resolved plugin: liquibase-maven-plugin-5.0.3.jar
-[INFO] Resolved plugin dependency:
-[INFO]       liquibase-maven-plugin-5.0.3.jar
-[INFO]       liquibase-core-5.0.3.jar
-[INFO]       snakeyaml-2.6.jar
-[INFO]       commons-collections4-4.5.0.jar
-[INFO]       commons-text-1.15.0.jar
-[INFO]       opencsv-5.12.0.jar
-[INFO]       jaxb-api-2.3.1.jar
-[INFO]       commons-lang3-3.20.0.jar
-[INFO]       commons-io-2.22.0.jar
-[INFO] Resolved dependency: spring-boot-starter-webmvc-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-webmvc-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-validation-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-jackson-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-webmvc-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-resttestclient-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-jackson-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-tomcat-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-http-converter-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-webmvc-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-validation-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-test-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-test-autoconfigure-4.1.1.jar
-[INFO] Resolved dependency: json-path-2.10.0.jar
-[INFO] Resolved dependency: jakarta.xml.bind-api-4.0.5.jar
-[INFO] Resolved dependency: json-smart-2.6.0.jar
-[INFO] Resolved dependency: assertj-core-3.27.7.jar
-[INFO] Resolved dependency: awaitility-4.3.0.jar
-[INFO] Resolved dependency: hamcrest-3.0.jar
-[INFO] Resolved dependency: junit-jupiter-6.0.3.jar
-[INFO] Resolved dependency: mockito-core-5.23.0.jar
-[INFO] Resolved dependency: mockito-junit-jupiter-5.23.0.jar
-[INFO] Resolved dependency: jsonassert-1.5.3.jar
-[INFO] Resolved dependency: spring-core-7.0.9.jar
-[INFO] Resolved dependency: spring-test-7.0.9.jar
-[INFO] Resolved dependency: xmlunit-core-2.11.0.jar
-[INFO] Resolved dependency: spring-boot-web-server-4.1.1.jar
-[INFO] Resolved dependency: spring-web-7.0.9.jar
-[INFO] Resolved dependency: spring-boot-starter-logging-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-autoconfigure-4.1.1.jar
-[INFO] Resolved dependency: jakarta.annotation-api-3.0.0.jar
-[INFO] Resolved dependency: snakeyaml-2.6.jar
-[INFO] Resolved dependency: spring-boot-jackson-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-tomcat-runtime-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-tomcat-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-servlet-4.1.1.jar
-[INFO] Resolved dependency: spring-webmvc-7.0.9.jar
-[INFO] Resolved dependency: tomcat-embed-el-11.0.24.jar
-[INFO] Resolved dependency: hibernate-validator-9.1.3.Final.jar
-[INFO] Resolved dependency: slf4j-api-2.0.18.jar
+[INFO] Resolved dependency: commons-logging-1.3.6.jar
+[INFO] Resolved dependency: jspecify-1.0.1.jar
+[INFO] Resolved dependency: tomcat-embed-core-11.0.24.jar
+[INFO] Resolved dependency: tomcat-embed-websocket-11.0.24.jar
+[INFO] Resolved dependency: micrometer-observation-1.17.1.jar
+[INFO] Resolved dependency: spring-expression-7.0.9.jar
+[INFO] Resolved dependency: testcontainers-2.0.5.jar
+[INFO] Resolved dependency: jakarta.validation-api-3.1.1.jar
+[INFO] Resolved dependency: jboss-logging-3.6.3.Final.jar
+[INFO] Resolved dependency: classmate-1.7.3.jar
 [INFO] Resolved dependency: jakarta.activation-api-2.1.4.jar
 [INFO] Resolved dependency: accessors-smart-2.6.0.jar
 [INFO] Resolved dependency: byte-buddy-1.18.11.jar
@@ -3665,35 +2751,33 @@
 [INFO] Resolved dependency: byte-buddy-agent-1.18.11.jar
 [INFO] Resolved dependency: objenesis-3.3.jar
 [INFO] Resolved dependency: android-json-0.0.20131108.vaadin1.jar
-[INFO] Resolved dependency: commons-logging-1.3.6.jar
-[INFO] Resolved dependency: jspecify-1.0.1.jar
-[INFO] Resolved dependency: spring-beans-7.0.9.jar
-[INFO] Resolved dependency: micrometer-observation-1.17.1.jar
-[INFO] Resolved dependency: logback-classic-1.5.38.jar
-[INFO] Resolved dependency: log4j-to-slf4j-2.25.5.jar
-[INFO] Resolved dependency: jul-to-slf4j-2.0.18.jar
-[INFO] Resolved dependency: jackson-databind-3.1.5.jar
-[INFO] Resolved dependency: tomcat-embed-core-11.0.24.jar
-[INFO] Resolved dependency: tomcat-embed-websocket-11.0.24.jar
-[INFO] Resolved dependency: spring-context-7.0.9.jar
-[INFO] Resolved dependency: spring-aop-7.0.9.jar
-[INFO] Resolved dependency: spring-expression-7.0.9.jar
-[INFO] Resolved dependency: jakarta.validation-api-3.1.1.jar
-[INFO] Resolved dependency: jboss-logging-3.6.3.Final.jar
-[INFO] Resolved dependency: classmate-1.7.3.jar
+[INFO] Resolved dependency: logback-core-1.5.38.jar
+[INFO] Resolved dependency: log4j-api-2.25.5.jar
+[INFO] Resolved dependency: netty-resolver-4.2.17.Final.jar
+[INFO] Resolved dependency: netty-buffer-4.2.17.Final.jar
+[INFO] Resolved dependency: netty-transport-native-unix-common-4.2.17.Final.jar
+[INFO] Resolved dependency: netty-codec-base-4.2.17.Final.jar
+[INFO] Resolved dependency: reactive-streams-1.0.4.jar
+[INFO] Resolved dependency: netty-codec-dns-4.2.17.Final.jar
+[INFO] Resolved dependency: micrometer-commons-1.17.1.jar
+[INFO] Resolved dependency: commons-compress-1.28.0.jar
+[INFO] Resolved dependency: duct-tape-1.0.8.jar
+[INFO] Resolved dependency: docker-java-api-3.7.1.jar
+[INFO] Resolved dependency: docker-java-transport-zerodep-3.7.1.jar
 [INFO] Resolved dependency: asm-9.7.1.jar
 [INFO] Resolved dependency: opentest4j-1.3.0.jar
 [INFO] Resolved dependency: junit-platform-commons-6.0.3.jar
 [INFO] Resolved dependency: apiguardian-api-1.1.2.jar
 [INFO] Resolved dependency: junit-platform-engine-6.0.3.jar
-[INFO] Resolved dependency: micrometer-commons-1.17.1.jar
-[INFO] Resolved dependency: logback-core-1.5.38.jar
-[INFO] Resolved dependency: log4j-api-2.25.5.jar
-[INFO] Resolved dependency: jackson-annotations-2.21.jar
-[INFO] Resolved dependency: jackson-core-3.1.5.jar
+[INFO] Resolved dependency: commons-codec-1.21.0.jar
+[INFO] Resolved dependency: commons-io-2.20.0.jar
+[INFO] Resolved dependency: commons-lang3-3.20.0.jar
+[INFO] Resolved dependency: annotations-17.0.0.jar
+[INFO] Resolved dependency: docker-java-transport-3.7.1.jar
+[INFO] Resolved dependency: jna-5.18.1.jar
 [INFO] 
 [INFO] ---------------------< pe.axiz:settlement-service >---------------------
-[INFO] Building settlement-service 1.0.0                                  [5/5]
+[INFO] Building settlement-service 2.0.0                                  [4/4]
 [INFO]   from settlement-service/pom.xml
 [INFO] --------------------------------[ jar ]---------------------------------
 [INFO] 
@@ -4519,15 +3603,23 @@
 [INFO]       jaxb-api-2.3.1.jar
 [INFO]       commons-lang3-3.20.0.jar
 [INFO]       commons-io-2.22.0.jar
-[INFO] Resolved dependency: spring-boot-starter-webmvc-4.1.1.jar
-[INFO] Resolved dependency: flyway-database-postgresql-12.4.0.jar
-[INFO] Resolved dependency: spring-boot-starter-validation-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-starter-webmvc-test-4.1.1.jar
-[INFO] Resolved dependency: h2-2.4.240.jar
-[INFO] Resolved dependency: spring-boot-starter-jdbc-4.1.1.jar
 [INFO] Resolved dependency: flyway-core-12.4.0.jar
 [INFO] Resolved dependency: testcontainers-postgresql-2.0.5.jar
+[INFO] Resolved dependency: kafka-clients-4.2.1.jar
+[INFO] Resolved dependency: flyway-database-postgresql-12.4.0.jar
+[INFO] Resolved dependency: spring-boot-starter-jdbc-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-webmvc-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-validation-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-starter-webmvc-test-4.1.1.jar
+[INFO] Resolved dependency: jackson-databind-3.1.5.jar
+[INFO] Resolved dependency: testcontainers-jdbc-2.0.5.jar
+[INFO] Resolved dependency: zstd-jni-1.5.6-10.jar
+[INFO] Resolved dependency: lz4-java-1.10.1.jar
+[INFO] Resolved dependency: snappy-java-1.1.10.7.jar
+[INFO] Resolved dependency: slf4j-api-2.0.18.jar
 [INFO] Resolved dependency: spring-boot-starter-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-jdbc-4.1.1.jar
+[INFO] Resolved dependency: HikariCP-7.0.2.jar
 [INFO] Resolved dependency: spring-boot-starter-jackson-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-starter-tomcat-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-http-converter-4.1.1.jar
@@ -4537,18 +3629,20 @@
 [INFO] Resolved dependency: spring-boot-starter-test-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-webmvc-test-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-resttestclient-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-jdbc-4.1.1.jar
-[INFO] Resolved dependency: HikariCP-7.0.2.jar
-[INFO] Resolved dependency: jackson-databind-3.1.5.jar
-[INFO] Resolved dependency: testcontainers-jdbc-2.0.5.jar
+[INFO] Resolved dependency: jackson-annotations-2.21.jar
+[INFO] Resolved dependency: jackson-core-3.1.5.jar
+[INFO] Resolved dependency: testcontainers-database-commons-2.0.5.jar
 [INFO] Resolved dependency: spring-boot-starter-logging-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-autoconfigure-4.1.1.jar
 [INFO] Resolved dependency: jakarta.annotation-api-3.0.0.jar
 [INFO] Resolved dependency: snakeyaml-2.6.jar
+[INFO] Resolved dependency: spring-boot-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-sql-4.1.1.jar
+[INFO] Resolved dependency: spring-boot-transaction-4.1.1.jar
+[INFO] Resolved dependency: spring-jdbc-7.0.9.jar
 [INFO] Resolved dependency: spring-boot-jackson-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-starter-tomcat-runtime-4.1.1.jar
 [INFO] Resolved dependency: spring-boot-tomcat-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-4.1.1.jar
 [INFO] Resolved dependency: spring-web-7.0.9.jar
 [INFO] Resolved dependency: spring-boot-servlet-4.1.1.jar
 [INFO] Resolved dependency: spring-webmvc-7.0.9.jar
@@ -4570,20 +3664,16 @@
 [INFO] Resolved dependency: spring-test-7.0.9.jar
 [INFO] Resolved dependency: xmlunit-core-2.11.0.jar
 [INFO] Resolved dependency: spring-boot-web-server-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-sql-4.1.1.jar
-[INFO] Resolved dependency: spring-boot-transaction-4.1.1.jar
-[INFO] Resolved dependency: spring-jdbc-7.0.9.jar
-[INFO] Resolved dependency: slf4j-api-2.0.18.jar
-[INFO] Resolved dependency: jackson-annotations-2.21.jar
-[INFO] Resolved dependency: jackson-core-3.1.5.jar
-[INFO] Resolved dependency: testcontainers-database-commons-2.0.5.jar
+[INFO] Resolved dependency: testcontainers-2.0.5.jar
 [INFO] Resolved dependency: logback-classic-1.5.38.jar
 [INFO] Resolved dependency: log4j-to-slf4j-2.25.5.jar
 [INFO] Resolved dependency: jul-to-slf4j-2.0.18.jar
+[INFO] Resolved dependency: spring-context-7.0.9.jar
+[INFO] Resolved dependency: spring-boot-persistence-4.1.1.jar
+[INFO] Resolved dependency: spring-tx-7.0.9.jar
+[INFO] Resolved dependency: spring-beans-7.0.9.jar
 [INFO] Resolved dependency: tomcat-embed-core-11.0.24.jar
 [INFO] Resolved dependency: tomcat-embed-websocket-11.0.24.jar
-[INFO] Resolved dependency: spring-context-7.0.9.jar
-[INFO] Resolved dependency: spring-beans-7.0.9.jar
 [INFO] Resolved dependency: micrometer-observation-1.17.1.jar
 [INFO] Resolved dependency: spring-aop-7.0.9.jar
 [INFO] Resolved dependency: spring-expression-7.0.9.jar
@@ -4601,9 +3691,10 @@
 [INFO] Resolved dependency: android-json-0.0.20131108.vaadin1.jar
 [INFO] Resolved dependency: commons-logging-1.3.6.jar
 [INFO] Resolved dependency: jspecify-1.0.1.jar
-[INFO] Resolved dependency: spring-boot-persistence-4.1.1.jar
-[INFO] Resolved dependency: spring-tx-7.0.9.jar
-[INFO] Resolved dependency: testcontainers-2.0.5.jar
+[INFO] Resolved dependency: commons-compress-1.28.0.jar
+[INFO] Resolved dependency: duct-tape-1.0.8.jar
+[INFO] Resolved dependency: docker-java-api-3.7.1.jar
+[INFO] Resolved dependency: docker-java-transport-zerodep-3.7.1.jar
 [INFO] Resolved dependency: logback-core-1.5.38.jar
 [INFO] Resolved dependency: log4j-api-2.25.5.jar
 [INFO] Resolved dependency: micrometer-commons-1.17.1.jar
@@ -4612,10 +3703,6 @@
 [INFO] Resolved dependency: junit-platform-commons-6.0.3.jar
 [INFO] Resolved dependency: apiguardian-api-1.1.2.jar
 [INFO] Resolved dependency: junit-platform-engine-6.0.3.jar
-[INFO] Resolved dependency: commons-compress-1.28.0.jar
-[INFO] Resolved dependency: duct-tape-1.0.8.jar
-[INFO] Resolved dependency: docker-java-api-3.7.1.jar
-[INFO] Resolved dependency: docker-java-transport-zerodep-3.7.1.jar
 [INFO] Resolved dependency: commons-codec-1.21.0.jar
 [INFO] Resolved dependency: commons-io-2.20.0.jar
 [INFO] Resolved dependency: commons-lang3-3.20.0.jar
@@ -4623,16 +3710,15 @@
 [INFO] Resolved dependency: docker-java-transport-3.7.1.jar
 [INFO] Resolved dependency: jna-5.18.1.jar
 [INFO] ------------------------------------------------------------------------
-[INFO] Reactor Summary for Axiz Floci Payments 1.0.0:
+[INFO] Reactor Summary for Axiz Floci Payments 2.0.0:
 [INFO] 
-[INFO] Axiz Floci Payments ................................ SUCCESS [  1.330 s]
-[INFO] platform ........................................... SUCCESS [  0.402 s]
-[INFO] payment-service .................................... SUCCESS [  0.268 s]
-[INFO] acquirer-service ................................... SUCCESS [  0.270 s]
-[INFO] settlement-service ................................. SUCCESS [  0.235 s]
+[INFO] Axiz Floci Payments ................................ SUCCESS [  1.210 s]
+[INFO] platform ........................................... SUCCESS [  0.267 s]
+[INFO] payment-service .................................... SUCCESS [  0.226 s]
+[INFO] settlement-service ................................. SUCCESS [  0.209 s]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  3.018 s
-[INFO] Finished at: 2026-10-06T04:48:00Z
+[INFO] Total time:  2.319 s
+[INFO] Finished at: 2026-10-06T05:17:35Z
 [INFO] ------------------------------------------------------------------------

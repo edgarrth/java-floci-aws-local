@@ -2,4 +2,6 @@
 .env
 .runtime
 **/target
+**/__pycache__
+.ruff_cache
 *.zip

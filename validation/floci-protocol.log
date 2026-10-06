@@ -1,10 +1,6 @@
-OIDC identity configured
-Resources and least-privilege policies configured
-IRSA signature and subject enforcement passed
-IAM deny passed
-SSM, Secrets Manager, CloudWatch and EventBridge runtime permissions passed
-SNS FIFO and SQS ack passed
-KMS signing and S3 persistence passed
-API Gateway provisioning passed
-API Gateway HTTP proxy, path parameters and authentication header forwarding passed
-Java 25 / Boot 4.1.1 REST startup, DynamoDB idempotency, query, route catalogue and 401 passed
+Se comprobó OIDC firmado, STS y rechazo de otro ServiceAccount.
+Se comprobó SSM, Secrets Manager y CloudWatch con el rol de pagos.
+Se comprobó SNS FIFO, SQS y confirmación mediante los roles de aplicación.
+Se comprobó firma KMS y persistencia S3 con el rol de liquidación.
+Se comprobó API Gateway HTTP proxy, parámetros y cabeceras con un backend de prueba.
+La validación de protocolo no ejecuta motores PostgreSQL, Redis, MSK ni pods EKS.

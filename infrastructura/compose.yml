@@ -1,4 +1,4 @@
-name: axiz
+name: axiz-floci
 x-build: &application-build
   context: ..
   dockerfile: infrastructura/Dockerfile.application
@@ -17,7 +17,6 @@ x-common: &common
     DB_HOST: floci
     DB_PORT: 7001
     DB_CA: /app/runtime/rds-ca.crt
-    ACQUIRER_URL: http://acquirer:8081
     REDIS_HOST: floci
     REDIS_PORT: 6379
     KAFKA_BOOTSTRAP_FILE: /app/runtime/kafka-bootstrap
@@ -26,13 +25,13 @@ x-common: &common
       condition: service_completed_successfully
 services:
   java-base:
-    image: axiz-java-base:1.0.0
+    image: axiz-java-base:2.0.0
     build:
       context: ..
       dockerfile: infrastructura/Dockerfile.base
     command: ["true"]
   tools:
-    image: axiz-tools:1.0.0
+    image: axiz-tools:2.0.0
     profiles: [build]
     build:
       context: ..
@@ -62,7 +61,7 @@ services:
       FLOCI_SERVICES_ELASTICACHE_ENDPOINT_HOST: floci
       FLOCI_SERVICES_MSK_DEFAULT_IMAGE: redpandadata/redpanda:v26.2.3
       FLOCI_SERVICES_EKS_DEFAULT_IMAGE: rancher/k3s:v1.35.9-k3s1
-      FLOCI_SERVICES_EKS_MOCK: ${EKS_MOCK:-false}
+      FLOCI_SERVICES_EKS_MOCK: ${EKS_MOCK:-true}
       FLOCI_SERVICES_IAM_ENFORCEMENT_ENABLED: "true"
       FLOCI_SERVICES_IAM_SEED_DEPLOYER_PRINCIPAL: "true"
       FLOCI_SERVICES_UI_ENABLED: "false"
@@ -71,9 +70,9 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - floci-data:/app/data
+      - floci-data-v2:/app/data
   bootstrap:
-    image: axiz-tools:1.0.0
+    image: axiz-tools:2.0.0
     build:
       context: ..
       dockerfile: infrastructura/Dockerfile.tools
@@ -91,12 +90,12 @@ services:
         condition: service_started
     volumes:
       - ../.runtime:/workspace/.runtime
-      - floci-data:/floci-data:ro
+      - floci-data-v2:/floci-data:ro
       - /var/run/docker.sock:/var/run/docker.sock
     networks: [axiz]
     command: ["python3", "infrastructura/bootstrap.py", "provision"]
   token-renewer:
-    image: axiz-tools:1.0.0
+    image: axiz-tools:2.0.0
     depends_on:
       bootstrap:
         condition: service_completed_successfully
@@ -108,7 +107,7 @@ services:
     command: ["python3", "infrastructura/bootstrap.py", "tokens-loop"]
   payment:
     <<: *common
-    image: axiz-payment-service:1.0.0
+    image: axiz-payment-service:2.0.0
     profiles: [full,build]
     build:
       <<: *application-build
@@ -119,55 +118,41 @@ services:
       AWS_ROLE_ARN: arn:aws:iam::000000000000:role/axiz-payment
       AWS_WEB_IDENTITY_TOKEN_FILE: /app/runtime/payment.token
       DB_USER: axiz_payment
-  acquirer:
-    <<: *common
-    image: axiz-acquirer-service:1.0.0
-    profiles: [full,build]
-    build:
-      <<: *application-build
-      args: {SERVICE: acquirer-service}
-    ports: ["127.0.0.1:8081:8081"]
-    environment:
-      <<: *common-env
-      AWS_ROLE_ARN: arn:aws:iam::000000000000:role/axiz-acquirer
-      AWS_WEB_IDENTITY_TOKEN_FILE: /app/runtime/acquirer.token
   settlement:
     <<: *common
-    image: axiz-settlement-service:1.0.0
+    image: axiz-settlement-service:2.0.0
     profiles: [full,build]
     build:
       <<: *application-build
       args: {SERVICE: settlement-service}
-    ports: ["127.0.0.1:8082:8082"]
+    ports: ["127.0.0.1:8081:8081"]
     environment:
       <<: *common-env
       AWS_ROLE_ARN: arn:aws:iam::000000000000:role/axiz-settlement
       AWS_WEB_IDENTITY_TOKEN_FILE: /app/runtime/settlement.token
       DB_USER: axiz_settlement
   seed:
-    image: axiz-tools:1.0.0
+    image: axiz-tools:2.0.0
     profiles: [full]
     depends_on:
       payment:
-        condition: service_started
-      acquirer:
         condition: service_started
       settlement:
         condition: service_started
     volumes: ["../.runtime:/workspace/.runtime"]
     networks: [axiz]
-    command: ["python3", "datasets/seed.py", "http://payment:8080", "http://acquirer:8081"]
+    command: ["python3", "datasets/seed.py", "http://payment:8080"]
   routes:
-    image: axiz-tools:1.0.0
+    image: axiz-tools:2.0.0
     profiles: [full]
     depends_on:
       seed:
         condition: service_completed_successfully
     networks: [axiz]
-    command: ["python3", "infrastructura/routes.py", "http://payment:8080", "http://acquirer:8081", "http://settlement:8082"]
+    command: ["python3", "infrastructura/routes.py", "http://payment:8080", "http://settlement:8081"]
   eks-deploy:
     env_file: ../.env
-    image: axiz-tools:1.0.0
+    image: axiz-tools:2.0.0
     profiles: [eks]
     environment:
       AWS_ENDPOINT_URL: http://floci:4566
@@ -186,4 +171,4 @@ networks:
   axiz:
     name: axiz-network
 volumes:
-  floci-data:
+  floci-data-v2:

@@ -1,22 +1,32 @@
 {
+  "version": "2.0.0",
+  "focus": "Arquitectura de microservicios sobre Floci",
+  "microservices": [
+    "payment-service",
+    "settlement-service"
+  ],
+  "shared_library": "platform",
   "java": "25",
-  "maven": "3.10.0",
   "spring_boot": "4.1.1",
-  "resilience4j": "2.4.0",
+  "spring_framework": "7.0.9",
+  "maven": "3.10.0",
+  "floci": "2.1.0",
   "tests": {
-    "passed": 29,
+    "passed": 27,
     "skipped": 4,
     "failures": 0,
     "errors": 0
   },
   "checks": {
     "java_format": "Spotless aprobado",
-    "python_linter": "Ruff aprobado",
-    "shell_linter": "ShellCheck aprobado",
-    "yaml": "Sintaxis aprobada"
+    "python_format": "Ruff format aprobado",
+    "python_lint": "Ruff check aprobado",
+    "shell_lint": "ShellCheck aprobado",
+    "dependency_base": "Resolución offline del reactor aprobada"
   },
   "limitations": [
-    "No se ejecutó Compose ni EKS: Docker no está disponible en el entorno de validación.",
-    "Las cuatro pruebas PostgreSQL con Testcontainers están compiladas, pero omitidas."
+    "No se ejecutó Docker Compose ni EKS: no se dispone de Docker en el entorno de validación.",
+    "Las cuatro pruebas PostgreSQL están compiladas, pero omitidas.",
+    "Las pruebas de protocolo AWS no prueban los motores PostgreSQL, Redis, MSK ni pods EKS."
   ]
 }

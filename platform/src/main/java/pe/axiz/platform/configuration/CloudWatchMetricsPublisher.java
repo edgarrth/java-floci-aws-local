@@ -16,6 +16,7 @@ public class CloudWatchMetricsPublisher {
   private final CloudWatchClient cloudWatch;
   private final MeterRegistry metrics;
   private final String service;
+  private long previousCount;
 
   public CloudWatchMetricsPublisher(CloudWatchClient c, MeterRegistry m, Environment e) {
     cloudWatch = c;
@@ -25,8 +26,9 @@ public class CloudWatchMetricsPublisher {
 
   @Scheduled(fixedDelay = 30000, initialDelay = 30000)
   public void publish() {
-    var counter =
+    var total =
         metrics.find("http.server.requests").timers().stream().mapToLong(t -> t.count()).sum();
+    var counter = Math.max(0, total - previousCount);
     try {
       cloudWatch.putMetricData(
           b ->
@@ -38,6 +40,7 @@ public class CloudWatchMetricsPublisher {
                           .unit(StandardUnit.COUNT)
                           .dimensions(Dimension.builder().name("Service").value(service).build())
                           .build()));
+      previousCount = total;
     } catch (RuntimeException ex) {
       LOG.warn("Se reintentará la publicación de métricas de {}", service);
     }

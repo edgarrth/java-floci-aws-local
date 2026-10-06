@@ -10,7 +10,7 @@ public record SettlementEvent(
     BigDecimal amount,
     String currency,
     String status,
-    String authorizationCode,
+    String reason,
     int schemaVersion) {
   public SettlementEvent {
     if (eventId == null
@@ -19,7 +19,7 @@ public record SettlementEvent(
         || amount == null
         || amount.signum() <= 0
         || !java.util.Set.of("PEN", "USD").contains(currency)
-        || !java.util.Set.of("AUTHORIZED", "DECLINED").contains(status)
+        || !java.util.Set.of("ACCEPTED", "REJECTED").contains(status)
         || schemaVersion != 1)
       throw new IllegalArgumentException("El evento de liquidación no es válido");
   }

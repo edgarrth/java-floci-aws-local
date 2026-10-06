@@ -153,7 +153,7 @@ def identity(iam, eks):
         ),
         {"NoSuchEntity", "NoSuchEntityException"},
     )
-    for service in ("payment", "acquirer", "settlement"):
+    for service in ("payment", "settlement"):
         trust = {
             "Version": "2012-10-17",
             "Statement": [
@@ -213,14 +213,17 @@ def resources():
     )
     (RUNTIME / "api-key").write_text(sm.get_secret_value(SecretId="/axiz/api-key")["SecretString"])
     (RUNTIME / "api-key").chmod(0o600)
-    client("ssm").put_parameter(
-        Name="/axiz/merchants/merchant-demo/limit",
-        Value="5000.00",
-        Type="String",
-        Overwrite=True,
+    ensure(
+        lambda: client("ssm").get_parameter(Name="/axiz/merchants/merchant-demo/limit"),
+        lambda: client("ssm").put_parameter(
+            Name="/axiz/merchants/merchant-demo/limit",
+            Value="5000.00",
+            Type="String",
+        ),
+        {"ParameterNotFound"},
     )
     ddb = client("dynamodb")
-    for table in ("axiz-authorizations", "axiz-settlements"):
+    for table in ("axiz-payment-audit", "axiz-settlements"):
         ensure(
             lambda t=table: ddb.describe_table(TableName=t),
             lambda t=table: ddb.create_table(
@@ -280,56 +283,31 @@ def resources():
             Endpoint=queue_arn,
             Attributes={"RawMessageDelivery": "true"},
         )
-    events = client("events")
-    ensure(
-        lambda: events.describe_event_bus(Name="axiz-payments"),
-        lambda: events.create_event_bus(Name="axiz-payments"),
-        {"ResourceNotFoundException"},
+    sqs.set_queue_attributes(
+        QueueUrl=queue,
+        Attributes={
+            "Policy": json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"Service": "sns.amazonaws.com"},
+                            "Action": "sqs:SendMessage",
+                            "Resource": queue_arn,
+                            "Condition": {"ArnEquals": {"aws:SourceArn": topic}},
+                        }
+                    ],
+                }
+            )
+        },
     )
-    audit = sqs.create_queue(QueueName="axiz-audit")["QueueUrl"]
-    audit_arn = sqs.get_queue_attributes(QueueUrl=audit, AttributeNames=["QueueArn"])["Attributes"][
-        "QueueArn"
-    ]
-    rule = events.put_rule(
-        Name="payment-finalized",
-        EventBusName="axiz-payments",
-        EventPattern=json.dumps({"source": ["pe.axiz.payments"]}),
-        State="ENABLED",
-    )["RuleArn"]
-    events.put_targets(
-        Rule="payment-finalized",
-        EventBusName="axiz-payments",
-        Targets=[{"Id": "audit", "Arn": audit_arn}],
-    )
-    for url, arn, source, principal in (
-        (queue, queue_arn, topic, "sns.amazonaws.com"),
-        (audit, audit_arn, rule, "events.amazonaws.com"),
-    ):
-        sqs.set_queue_attributes(
-            QueueUrl=url,
-            Attributes={
-                "Policy": json.dumps(
-                    {
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Effect": "Allow",
-                                "Principal": {"Service": principal},
-                                "Action": "sqs:SendMessage",
-                                "Resource": arn,
-                                "Condition": {"ArnEquals": {"aws:SourceArn": source}},
-                            }
-                        ],
-                    }
-                )
-            },
-        )
     cw = client("cloudwatch")
     cw.put_metric_alarm(
-        AlarmName="axiz-acquirer-errors",
+        AlarmName="axiz-payment-volume",
         Namespace="Axiz/Payments",
         MetricName="HttpRequests",
-        Dimensions=[{"Name": "Service", "Value": "acquirer-service"}],
+        Dimensions=[{"Name": "Service", "Value": "payment-service"}],
         Statistic="Sum",
         Period=60,
         EvaluationPeriods=1,
@@ -452,6 +430,12 @@ def database():
                     psycopg.sql.Identifier("axiz_" + service),
                 )
             )
+            cur.execute(
+                psycopg.sql.SQL("REVOKE ALL ON TABLE {}.flyway_schema_history FROM {}").format(
+                    psycopg.sql.Identifier(service),
+                    psycopg.sql.Identifier("axiz_" + service),
+                )
+            )
     return cluster.get("DbClusterResourceId", cluster.get("DBClusterResourceId")), db_port
 
 
@@ -459,7 +443,7 @@ def policies(iam, resource, db_resource):
     def arn(service, value):
         return f"arn:aws:{service}:{REGION}:{ACCOUNT}:{value}"
 
-    for service in ("payment", "acquirer", "settlement"):
+    for service in ("payment", "settlement"):
         statements = [
             {
                 "Effect": "Allow",
@@ -495,19 +479,14 @@ def policies(iam, resource, db_resource):
                     "Action": ["sns:Publish"],
                     "Resource": resource["topic"],
                 },
+                # Se compensa la resolución de recursos SNS del protocolo JSON en Floci 2.1.0.
+                # Se retira esta concesión al adaptar la política a AWS.
                 {
+                    "Sid": "FlociSnsProtocolCompatibility",
                     "Effect": "Allow",
-                    "Action": ["events:PutEvents"],
-                    "Resource": "*",
+                    "Action": ["sns:Publish"],
+                    "Resource": arn("sns", "*"),
                 },
-            ]
-        elif service == "acquirer":
-            statements += [
-                {
-                    "Effect": "Allow",
-                    "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
-                    "Resource": arn("dynamodb", "table/axiz-authorizations"),
-                }
             ]
         else:
             statements += [
@@ -531,24 +510,32 @@ def policies(iam, resource, db_resource):
                     "Action": ["kms:Sign"],
                     "Resource": resource["kms"],
                 },
+                # Se compensa la resolución global de KeyId del protocolo KMS en Floci 2.1.0.
+                # Se conserva la acción Sign y se limita la concesión a claves de la misma cuenta y región.
+                {
+                    "Sid": "FlociKmsProtocolCompatibility",
+                    "Effect": "Allow",
+                    "Action": ["kms:Sign"],
+                    "Resource": arn("kms", "key/*"),
+                },
                 {
                     "Effect": "Allow",
                     "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
-                    "Resource": arn("dynamodb", "table/axiz-settlements"),
+                    "Resource": [
+                        arn("dynamodb", "table/axiz-settlements"),
+                        arn("dynamodb", "table/axiz-payment-audit"),
+                    ],
                 },
             ]
-        if service != "acquirer":
-            if not db_resource:
-                raise RuntimeError(
-                    "Aurora no devolvió DbClusterResourceId para acotar rds-db:connect"
-                )
-            statements += [
-                {
-                    "Effect": "Allow",
-                    "Action": ["rds-db:connect"],
-                    "Resource": arn("rds-db", f"dbuser:{db_resource}/axiz_{service}"),
-                }
-            ]
+        if not db_resource:
+            raise RuntimeError("Aurora no devolvió DbClusterResourceId para acotar rds-db:connect")
+        statements.append(
+            {
+                "Effect": "Allow",
+                "Action": ["rds-db:connect"],
+                "Resource": arn("rds-db", f"dbuser:{db_resource}/axiz_{service}"),
+            }
+        )
         iam.put_role_policy(
             RoleName="axiz-" + service,
             PolicyName="axiz-runtime",
@@ -618,21 +605,21 @@ def gateway(target):
     if target == "host":
         payment_base, settlement_base = (
             "http://host.docker.internal:8080",
-            "http://host.docker.internal:8082",
+            "http://host.docker.internal:8081",
         )
     elif target == "eks":
         payment_base, settlement_base = (
             "http://floci-eks-axiz-payments:30080",
-            "http://floci-eks-axiz-payments:30082",
+            "http://floci-eks-axiz-payments:30081",
         )
     else:
-        payment_base, settlement_base = "http://payment:8080", "http://settlement:8082"
+        payment_base, settlement_base = "http://payment:8080", "http://settlement:8081"
     for method, path, base in [
         ("POST", "/api/payments", payment_base),
         ("GET", "/api/payments/{id}", payment_base),
-        ("POST", "/api/payments/{id}/reconcile", payment_base),
         ("GET", "/api/settlements/{id}", settlement_base),
         ("GET", "/api/settlements/{id}/ledger", settlement_base),
+        ("GET", "/api/settlements/{id}/audit", settlement_base),
     ]:
         integration = api.create_integration(
             ApiId=identifier,
@@ -667,6 +654,7 @@ def provision():
         "axiz.aws.region=" + REGION + "\n"
         "axiz.database.port=" + str(db_port) + "\n"
         "axiz.topic-arn=" + resource["topic"] + "\n"
+        "axiz.kms-key=" + resource["kms"] + "\n"
         "axiz.queue-url=http://" + queue_host + ":4566/" + ACCOUNT + "/axiz-settlement.fifo\n"
     )
     endpoint = gateway(target)
@@ -675,6 +663,7 @@ def provision():
             {
                 **resource,
                 "dbPort": db_port,
+                "dbResourceId": db_resource,
                 "brokers": brokers,
                 "gateway": endpoint,
                 "target": target,
@@ -692,7 +681,7 @@ if __name__ == "__main__":
         provision()
     elif action == "tokens-loop":
         while True:
-            for svc in ("payment", "acquirer", "settlement"):
+            for svc in ("payment", "settlement"):
                 token(svc)
             time.sleep(600)
     elif action in ("token", "token-loop"):

@@ -54,7 +54,7 @@ class PostgresAdaptersTest {
             JsonMapper.builder().build());
   }
 
-  Payment pending() {
+  Payment accepted() {
     return new Payment(
         UUID.randomUUID(),
         "merchant-demo",
@@ -62,33 +62,28 @@ class PostgresAdaptersTest {
         "tok_demo",
         "integration-key",
         "fingerprint",
-        Payment.Status.PENDING,
-        null,
+        Payment.Status.ACCEPTED,
+        "POLICY_ACCEPTED",
         Instant.now());
   }
 
   @Test
-  void reserveIsUniqueAndDecisionOutboxIsAtomic() {
-    var p = pending();
-    assertThat(store.reserve(p).created()).isTrue();
-    assertThat(store.reserve(p).created()).isFalse();
-    var finalPayment = p.complete(Payment.Status.AUTHORIZED, "AX1");
-    store.complete(finalPayment);
-    store.complete(finalPayment);
+  void paymentAndBothDestinationsArePersistedOnce() {
+    var payment = accepted();
+    assertThat(store.record(payment)).isEqualTo(payment);
+    assertThat(store.record(payment)).isEqualTo(payment);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payments", Long.class)).isEqualTo(1L);
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox", Long.class)).isEqualTo(3L);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox", Long.class)).isEqualTo(2L);
   }
 
   @Test
-  void failureDuringOutboxRollsBackPaymentDecision() {
-    var p = pending();
-    store.reserve(p);
+  void failureDuringSecondDeliveryRollsBackEntirePayment() {
     jdbc.execute(
-        "ALTER TABLE outbox ADD CONSTRAINT test_destination CHECK (destination <> 'EVENTBRIDGE')");
+        "ALTER TABLE outbox ADD CONSTRAINT test_destination CHECK (destination <> 'KAFKA')");
     try {
-      assertThatThrownBy(() -> store.complete(p.complete(Payment.Status.AUTHORIZED, "AX1")))
-          .isInstanceOf(RuntimeException.class);
-      assertThat(store.find(p.id()).orElseThrow().status()).isEqualTo(Payment.Status.PENDING);
+      var payment = accepted();
+      assertThatThrownBy(() -> store.record(payment)).isInstanceOf(RuntimeException.class);
+      assertThat(store.find(payment.id())).isEmpty();
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox", Long.class)).isZero();
     } finally {
       jdbc.execute("ALTER TABLE outbox DROP CONSTRAINT test_destination");

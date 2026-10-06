@@ -16,14 +16,7 @@ class SettlementServiceTest {
     var p = mock(LedgerPort.class);
     var e =
         new SettlementEvent(
-            "e1",
-            UUID.randomUUID(),
-            "merchant-demo",
-            BigDecimal.ONE,
-            "PEN",
-            "AUTHORIZED",
-            "AX1",
-            1);
+            "e1", UUID.randomUUID(), "merchant-demo", BigDecimal.ONE, "PEN", "ACCEPTED", "AX1", 1);
     when(p.accept(e)).thenReturn(true);
     assertThat(new SettlementService(p).settle(e)).isTrue();
     verify(p).accept(e);
@@ -39,7 +32,7 @@ class SettlementServiceTest {
                     "merchant-demo",
                     BigDecimal.ONE,
                     "PEN",
-                    "AUTHORIZED",
+                    "ACCEPTED",
                     "AX1",
                     2))
         .isInstanceOf(IllegalArgumentException.class);

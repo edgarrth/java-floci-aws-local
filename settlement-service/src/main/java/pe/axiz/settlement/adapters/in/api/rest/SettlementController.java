@@ -4,6 +4,7 @@ import java.util.*;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
+import pe.axiz.settlement.application.ports.out.AuditPort;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
@@ -12,11 +13,22 @@ public class SettlementController {
   private final JdbcTemplate jdbc;
   private final DynamoDbClient dynamo;
   private final String table;
+  private final AuditPort audit;
 
-  public SettlementController(JdbcTemplate jdbc, DynamoDbClient dynamo, Environment e) {
+  public SettlementController(
+      JdbcTemplate jdbc, DynamoDbClient dynamo, Environment e, AuditPort audit) {
     this.jdbc = jdbc;
     this.dynamo = dynamo;
     table = e.getRequiredProperty("axiz.projection-table");
+    this.audit = audit;
+  }
+
+  @GetMapping("/api/settlements/{id}/audit")
+  Object audit(@PathVariable UUID id) {
+    return audit
+        .find(id + "-final")
+        .orElseThrow(
+            () -> new NoSuchElementException("La auditoría Kafka todavía no está disponible"));
   }
 
   @GetMapping("/api/settlements/{id}")

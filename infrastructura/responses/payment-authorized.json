@@ -1,8 +1,0 @@
-{
-  "id": "592db17b-b4f5-4d53-a8ef-5b6dcf64e76a",
-  "merchantId": "merchant-demo",
-  "amount": 25.5,
-  "currency": "PEN",
-  "status": "AUTHORIZED",
-  "authorizationCode": "AX592db17b"
-}

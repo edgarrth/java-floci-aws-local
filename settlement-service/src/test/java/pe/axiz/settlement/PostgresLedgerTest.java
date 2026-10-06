@@ -60,7 +60,7 @@ class PostgresLedgerTest {
         "merchant-demo",
         new BigDecimal("25.50"),
         "PEN",
-        "AUTHORIZED",
+        "ACCEPTED",
         "AX1",
         1);
   }

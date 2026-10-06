@@ -1,11 +1,11 @@
 package pe.axiz.platform.web;
 
-import io.github.resilience4j.bulkhead.BulkheadFullException;
-import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import java.util.NoSuchElementException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import software.amazon.awssdk.core.exception.SdkException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -29,18 +29,9 @@ public class ApiExceptionHandler {
     return problem(400, "La solicitud contiene campos inválidos");
   }
 
-  @ExceptionHandler(RequestNotPermitted.class)
-  ResponseEntity<ProblemDetail> rate(RequestNotPermitted e) {
-    return ResponseEntity.status(429)
-        .header("Retry-After", "1")
-        .body(
-            ProblemDetail.forStatusAndDetail(
-                HttpStatus.TOO_MANY_REQUESTS, "Se excedió el límite de solicitudes"));
-  }
-
-  @ExceptionHandler(BulkheadFullException.class)
-  ResponseEntity<ProblemDetail> busy(BulkheadFullException e) {
-    return problem(503, "Se agotó la capacidad concurrente");
+  @ExceptionHandler({SdkException.class, DataAccessException.class})
+  ResponseEntity<ProblemDetail> unavailable(RuntimeException exception) {
+    return problem(503, "No se pudo completar la operación con la infraestructura");
   }
 
   private ResponseEntity<ProblemDetail> problem(int code, String detail) {

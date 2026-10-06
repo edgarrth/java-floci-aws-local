@@ -13,7 +13,6 @@ import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.eventbridge.EventBridgeClient;
 import software.amazon.awssdk.services.kms.KmsClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
@@ -169,22 +168,6 @@ public class AwsConfiguration {
   KmsClient kms(AwsCredentialsProvider p) {
     return configure(
             KmsClient.builder()
-                .httpClientBuilder(
-                    UrlConnectionHttpClient.builder()
-                        .connectionTimeout(Duration.ofSeconds(2))
-                        .socketTimeout(Duration.ofSeconds(5)))
-                .overrideConfiguration(
-                    ClientOverrideConfiguration.builder()
-                        .apiCallTimeout(Duration.ofSeconds(8))
-                        .build()),
-            p)
-        .build();
-  }
-
-  @Bean(destroyMethod = "close")
-  EventBridgeClient events(AwsCredentialsProvider p) {
-    return configure(
-            EventBridgeClient.builder()
                 .httpClientBuilder(
                     UrlConnectionHttpClient.builder()
                         .connectionTimeout(Duration.ofSeconds(2))

@@ -31,14 +31,14 @@ public class JdbcLedger implements LedgerPort {
                       e.eventId(),
                       e.paymentId());
               if (n == 0) return false;
-              if (e.status().equals("AUTHORIZED")) {
+              if (e.status().equals("ACCEPTED")) {
                 jdbc.update(
                     "INSERT INTO ledger(payment_id,merchant_id,amount,currency,account) VALUES(?,?,?,?,?)",
                     e.paymentId(),
                     e.merchantId(),
                     e.amount(),
                     e.currency(),
-                    "ACQUIRER_RECEIVABLE");
+                    "PAYMENT_CLEARING");
                 jdbc.update(
                     "INSERT INTO ledger(payment_id,merchant_id,amount,currency,account) VALUES(?,?,?,?,?)",
                     e.paymentId(),

@@ -9,21 +9,19 @@
   </parent>
   <groupId>pe.axiz</groupId>
   <artifactId>floci-payments</artifactId>
-  <version>1.0.0</version>
+  <version>2.0.0</version>
   <packaging>pom</packaging>
   <name>Axiz Floci Payments</name>
-  <description>Procesamiento resiliente de pagos con servicios AWS emulados</description>
+  <description>Arquitectura de microservicios de pagos sobre Floci</description>
   <modules>
     <module>platform</module>
     <module>payment-service</module>
-    <module>acquirer-service</module>
     <module>settlement-service</module>
   </modules>
   <properties>
     <java.version>25</java.version>
     <maven.compiler.release>25</maven.compiler.release>
     <aws.version>2.55.11</aws.version>
-    <resilience4j.version>2.4.0</resilience4j.version>
     <spotless.version>3.0.0</spotless.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
@@ -33,13 +31,6 @@
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
         <version>${aws.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.github.resilience4j</groupId>
-        <artifactId>resilience4j-bom</artifactId>
-        <version>${resilience4j.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

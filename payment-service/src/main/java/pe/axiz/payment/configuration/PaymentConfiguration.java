@@ -10,12 +10,12 @@ import pe.axiz.payment.application.service.PaymentService;
 @Configuration
 public class PaymentConfiguration {
   @Bean
-  public TransactionTemplate transactionTemplate(PlatformTransactionManager m) {
-    return new TransactionTemplate(m);
+  public TransactionTemplate transactionTemplate(PlatformTransactionManager manager) {
+    return new TransactionTemplate(manager);
   }
 
   @Bean
-  PaymentService service(PaymentStore s, AuthorizationPort a, MerchantPolicyPort p) {
-    return new PaymentService(s, a, p, Clock.systemUTC());
+  PaymentService service(PaymentStore store, MerchantPolicyPort policies) {
+    return new PaymentService(store, policies, Clock.systemUTC());
   }
 }

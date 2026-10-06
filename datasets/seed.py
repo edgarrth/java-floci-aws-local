@@ -17,15 +17,6 @@ for _attempt in range(120):
         time.sleep(2)
 else:
     raise TimeoutError("El servicio de pagos no está disponible")
-acquirer = sys.argv[2] if len(sys.argv) > 2 else "http://localhost:8081"
-for _attempt in range(120):
-    try:
-        urllib.request.urlopen(acquirer + "/actuator/health/readiness", timeout=2).close()
-        break
-    except OSError:
-        time.sleep(2)
-else:
-    raise TimeoutError("El adquirente no está disponible")
 results = []
 for entry in json.loads((ROOT / "datasets/payments.json").read_text()):
     entry = dict(entry)
@@ -41,8 +32,8 @@ for entry in json.loads((ROOT / "datasets/payments.json").read_text()):
     )
     with urllib.request.urlopen(request, timeout=15) as response:
         result = json.load(response)
-        if result["status"] != "AUTHORIZED":
-            raise RuntimeError("El pago de precarga no fue autorizado: " + result["id"])
+        if result["status"] != "ACCEPTED":
+            raise RuntimeError("El pago de precarga no fue aceptado: " + result["id"])
         results.append(result)
 (ROOT / ".runtime/dataset-results.json").write_text(json.dumps(results, indent=2))
-print("Se precargaron " + str(len(results)) + " pagos autorizados.")
+print("Se precargaron " + str(len(results)) + " pagos aceptados.")

@@ -8,3 +8,5 @@ RUN curl --fail --silent --show-error --location https://download.docker.com/lin
 WORKDIR /workspace
 COPY infrastructura /workspace/infrastructura
 COPY datasets /workspace/datasets
+COPY payment-service/src/main/resources/db/migration /workspace/payment-service/src/main/resources/db/migration
+COPY settlement-service/src/main/resources/db/migration /workspace/settlement-service/src/main/resources/db/migration

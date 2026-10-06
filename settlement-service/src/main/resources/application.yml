@@ -8,8 +8,12 @@ spring:
       enabled: true
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  task:
+    scheduling:
+      pool:
+        size: 3
 server:
-  port: ${PORT:8082}
+  port: ${PORT:8081}
   shutdown: graceful
   tomcat:
     accesslog:
@@ -27,8 +31,9 @@ management:
 logging:
   level:
     org.springframework.web: WARN
+    org.apache.kafka: WARN
   pattern:
-    level: "%5p [${spring.application.name}] [%X{correlationId}]"
+    level: '%5p [${spring.application.name}] [%X{correlationId}]'
 axiz:
   aws:
     region: ${AWS_REGION:us-east-1}
@@ -45,22 +50,11 @@ axiz:
     schema: settlement
     ca: ${DB_CA:.runtime/rds-ca.crt}
   jobs-enabled: ${JOBS_ENABLED:true}
-  acquirer-url: ${ACQUIRER_URL:http://localhost:8081}
-  topic-arn: ${PAYMENT_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:axiz-payments.fifo}
   queue-url: ${SETTLEMENT_QUEUE_URL:http://localhost:4566/000000000000/axiz-settlement.fifo}
   bucket: axiz-receipts
   projection-table: axiz-settlements
-  acquirer-table: axiz-authorizations
-  event-bus: axiz-payments
   kms-key: alias/axiz-receipts
   kafka-bootstrap: ${KAFKA_BOOTSTRAP:localhost:9092}
   kafka-topic: axiz.payment.events
-  redis-host: ${REDIS_HOST:localhost}
-  redis-port: ${REDIS_PORT:6379}
-  resilience:
-    timeout-ms: ${RESILIENCE_TIMEOUT_MS:900}
-    max-attempts: ${RESILIENCE_MAX_ATTEMPTS:3}
-    max-concurrent: ${RESILIENCE_MAX_CONCURRENT:8}
-    ingress-per-second: ${RESILIENCE_INGRESS_PER_SECOND:30}
-    outbound-per-second: ${RESILIENCE_OUTBOUND_PER_SECOND:20}
-    open-seconds: ${RESILIENCE_OPEN_SECONDS:10}
+  audit-table: axiz-payment-audit
+  kafka-bootstrap-file: ${KAFKA_BOOTSTRAP_FILE:}

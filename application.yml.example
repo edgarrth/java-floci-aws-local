@@ -1,87 +1,104 @@
-# Se utiliza como configuración externa de ejemplo para payment-service.
-# Las configuraciones activas de cada servicio se encuentran en src/main/resources/application.yml.
+# Se ejemplifica el servicio de pagos en host; las variantes de liquidación se indican por propiedad.
 spring:
   config:
-    # Se importa el archivo de endpoints generado en el directorio indicado por AXIZ_RUNTIME_DIRECTORY.
-    # Se admiten .runtime/ para host, /app/runtime/ para Compose y /runtime/ para pods.
+    # Se admite optional:file:<directorio>aws.properties. AXIZ_RUNTIME_DIRECTORY selecciona el directorio.
+    # Se genera por bootstrap; no contiene credenciales, sólo región y endpoints descubiertos.
     import: optional:file:${AXIZ_RUNTIME_DIRECTORY:.runtime/}aws.properties
   application:
-    # payment-service, acquirer-service o settlement-service; se identifica el servicio en métricas y sesiones STS.
+    # payment-service: pagos. settlement-service: liquidación. Se usa como nombre de sesión STS y métrica.
     name: payment-service
   threads:
     virtual:
-      # true: hilos virtuales para solicitudes. false: hilos de plataforma.
+      # true: threads virtuales para solicitudes. false: threads de plataforma.
       enabled: true
+  task:
+    scheduling:
+      pool:
+        # Se admite un entero positivo; tres permite procesar SQS, MSK y comprobantes independientemente.
+        size: 3
+  lifecycle:
+    # Se admite una duración Spring, por ejemplo 20s o 1m. Se limita la espera de apagado por fase.
+    timeout-per-shutdown-phase: 20s
 server:
-  # Se admite un puerto entre 1024 y 65535; se usan 8080, 8081 y 8082 respectivamente.
-  port: 8080
-  # graceful: se espera la finalización de solicitudes. immediate: se interrumpe el servidor.
+  # PORT admite enteros entre 1 y 65535. 8080: pagos; 8081: liquidación.
+  port: ${PORT:8080}
+  # graceful: se completan solicitudes activas; immediate: cierre inmediato.
   shutdown: graceful
+  tomcat:
+    accesslog:
+      # false: no se escriben logs de sondas; true: access logs de todas las solicitudes.
+      enabled: false
+management:
+  endpoints:
+    web:
+      exposure:
+        # health: sondas; info: metadatos; metrics: consulta Micrometer; prometheus: exportación.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        # true: liveness/readiness. false: se deshabilitan las sondas adicionales.
+        enabled: true
+      # never: se ocultan detalles; always: detalles públicos; when-authorized: sólo usuarios autenticados.
+      show-details: never
+logging:
+  level:
+    # Se admiten TRACE, DEBUG, INFO, WARN, ERROR y OFF; WARN reduce ruido HTTP/Kafka.
+    org.springframework.web: WARN
+    org.apache.kafka: WARN
+  pattern:
+    # Se admite un patrón Logback; se muestran servicio y correlación sin tokens ni credenciales.
+    level: '%5p [${spring.application.name}] [%X{correlationId}]'
 axiz:
   aws:
-    # Se admite cualquier región AWS publicada; la precarga usa us-east-1.
-    region: us-east-1
-    # URL http de Floci local; vacío para endpoints oficiales de AWS mediante el SDK.
-    endpoint: http://localhost:4566
-    # ARN de axiz-payment, axiz-acquirer o axiz-settlement. Vacío activa DefaultCredentialsProvider.
-    role-arn: arn:aws:iam::000000000000:role/axiz-payment
-    # Ruta absoluta o relativa del JWT firmado; se renueva sin cambiar el nombre del archivo.
-    token-file: .runtime/payment.token
-  # Se admite el nombre o ARN del secreto de autenticación interna de los tres servicios.
+    # AWS_REGION: región de los recursos, por ejemplo us-east-1 o sa-east-1.
+    region: ${AWS_REGION:us-east-1}
+    # AWS_ENDPOINT_URL: URL Floci en host o http://floci:4566 en Compose/EKS; vacío usa endpoints AWS.
+    endpoint: ${AWS_ENDPOINT_URL:http://localhost:4566}
+    # AWS_ROLE_ARN: axiz-payment o axiz-settlement. Se admite un ARN IAM válido para identidad web.
+    # Vacío selecciona DefaultCredentialsProvider; en los modos incluidos se establece explícitamente el rol.
+    role-arn: ${AWS_ROLE_ARN:arn:aws:iam::000000000000:role/axiz-payment}
+    # AWS_WEB_IDENTITY_TOKEN_FILE: token JWT renovado; .runtime/payment.token o .runtime/settlement.token.
+    # En EKS se usa /identity/web-identity.token, sin claves de acceso permanentes.
+    token-file: ${AWS_WEB_IDENTITY_TOKEN_FILE:.runtime/payment.token}
+  # Se admite nombre o ARN de Secrets Manager; se usa para X-Internal-Key de endpoints internos.
   internal-secret-id: /axiz/internal-key
   database:
-    # true: PostgreSQL con tokens IAM. false: servicio sin almacenamiento relacional, como acquirer-service.
+    # true: datasource IAM PostgreSQL; false: no se registra el datasource. Ambos servicios necesitan true.
     enabled: true
-    # localhost: ejecución en host. floci: red Compose o alias del pod. En AWS se usa el endpoint Aurora.
-    host: localhost
-    # Se admite el puerto devuelto por DescribeDBClusters; la PoC reserva 7001.
-    port: 7001
-    # Se admite un identificador de base PostgreSQL; se aprovisiona axiz.
+    # DB_HOST: localhost en host o floci en Compose/EKS. Debe coincidir con el certificado y la firma IAM.
+    host: ${DB_HOST:localhost}
+    # DB_PORT admite 1..65535. Se descubre por bootstrap; el primer proxy RDS usa 7001.
+    port: ${DB_PORT:7001}
+    # Se admite un nombre PostgreSQL existente; axiz corresponde al cluster aprovisionado.
     name: axiz
-    # axiz_payment o axiz_settlement. No se utiliza el propietario de bootstrap en tiempo de ejecución.
-    user: axiz_payment
-    # payment o settlement; cada servicio mantiene su esquema.
+    # DB_USER: axiz_payment para pagos o axiz_settlement para liquidación; debe coincidir con rds-db:connect.
+    user: ${DB_USER:axiz_payment}
+    # payment: esquema de pagos. settlement: esquema de contabilidad; no se comparten permisos.
     schema: payment
-    # Ruta al certificado CA PEM. Se aplica siempre sslmode=verify-full.
-    ca: .runtime/rds-ca.crt
-  # true: workers activos. false: workers deshabilitados.
-  jobs-enabled: true
-  # URL base http local o https del adquirente; no se agrega una ruta final.
-  acquirer-url: http://localhost:8081
-  # ARN SNS FIFO del evento financiero definitivo; se mantiene el sufijo .fifo.
-  topic-arn: arn:aws:sns:us-east-1:000000000000:axiz-payments.fifo
-  # URL SQS FIFO de liquidación. En AWS se utiliza la URL devuelta por CreateQueue.
-  queue-url: http://localhost:4566/000000000000/axiz-settlement.fifo
-  # Nombre de bucket S3 conforme a DNS; se aprovisiona axiz-receipts.
-  bucket: axiz-receipts
-  # Nombre DynamoDB de proyección de liquidaciones.
-  projection-table: axiz-settlements
-  # Nombre DynamoDB de autorizaciones idempotentes.
-  acquirer-table: axiz-authorizations
-  # Nombre o ARN de bus EventBridge; se usa axiz-payments.
-  event-bus: axiz-payments
-  # Alias o ARN de clave KMS RSA_2048 SIGN_VERIFY. Se usa RSASSA_PSS_SHA_256.
-  kms-key: alias/axiz-receipts
-  # Lista host:puerto separada por comas. El endpoint efectivo se obtiene del archivo siguiente si existe.
-  kafka-bootstrap: localhost:9092
-  # Ruta del endpoint descubierto. Vacío usa kafka-bootstrap directamente.
-  kafka-bootstrap-file: .runtime/kafka-bootstrap
-  # Nombre del topic Kafka; se publica con paymentId como clave y acks=all.
+    # DB_CA: ruta de la CA RDS. Se verifica TLS con verify-full; no se admite deshabilitar TLS en el flujo.
+    ca: ${DB_CA:.runtime/rds-ca.crt}
+  # JOBS_ENABLED admite true o false; se habilitan los workers y métricas programados con true.
+  jobs-enabled: ${JOBS_ENABLED:true}
+  # PAYMENT_TOPIC_ARN: ARN SNS FIFO publicado por bootstrap; sólo se usa en pagos.
+  topic-arn: ${PAYMENT_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:axiz-payments.fifo}
+  # SETTLEMENT_QUEUE_URL: URL SQS de liquidación, con hostname accesible desde el servicio; sólo liquidación.
+  queue-url: ${SETTLEMENT_QUEUE_URL:http://localhost:4566/000000000000/axiz-settlement.fifo}
+  # KAFKA_BOOTSTRAP_FILE: ruta con los brokers anunciados. Vacío selecciona KAFKA_BOOTSTRAP.
+  kafka-bootstrap-file: ${KAFKA_BOOTSTRAP_FILE:.runtime/kafka-bootstrap}
+  # KAFKA_BOOTSTRAP: lista host:puerto separada por comas; se usa si no hay archivo de descubrimiento.
+  kafka-bootstrap: ${KAFKA_BOOTSTRAP:localhost:9092}
+  # Se admite un topic Kafka válido; se usa el mismo en productor y consumidor de auditoría.
   kafka-topic: axiz.payment.events
-  # localhost: host. floci: Compose o pod. En AWS se utiliza el endpoint ElastiCache.
-  redis-host: localhost
-  # Se admite un puerto TCP; la PoC reserva 6379.
-  redis-port: 6379
-  resilience:
-    # Entero positivo; límite de milisegundos por intento.
-    timeout-ms: 900
-    # Entero desde 1; se incluye el intento inicial.
-    max-attempts: 3
-    # Entero positivo; llamadas activas permitidas por instancia.
-    max-concurrent: 8
-    # Entero positivo; solicitudes de creación por segundo.
-    ingress-per-second: 30
-    # Entero positivo; intentos salientes por segundo.
-    outbound-per-second: 20
-    # Entero positivo; segundos antes de permitir sondas HALF_OPEN.
-    open-seconds: 10
+  # REDIS_HOST: localhost en host o floci en Compose/EKS; sólo el servicio de pagos utiliza la caché.
+  redis-host: ${REDIS_HOST:localhost}
+  # REDIS_PORT admite 1..65535; el proxy ElastiCache usa 6379.
+  redis-port: ${REDIS_PORT:6379}
+  # Se admite un bucket S3 existente; se usa sólo en liquidación para comprobantes versionados.
+  bucket: axiz-receipts
+  # Se admite una tabla DynamoDB con pk String; se usa sólo en liquidación para consulta de comprobantes.
+  projection-table: axiz-settlements
+  # Se admite una tabla DynamoDB con pk String; se registra el evento de MSK mediante escritura condicional.
+  audit-table: axiz-payment-audit
+  # Se admite alias, ID o ARN KMS con SIGN_VERIFY y RSA_2048; se usa RSASSA_PSS_SHA_256 en liquidación.
+  kms-key: alias/axiz-receipts

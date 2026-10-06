@@ -1,132 +1,118 @@
-# Axiz Payments: resiliencia y arquitectura AWS local con Floci
+# Arquitectura de microservicios de pagos con Floci
 
-Se implementa una PoC de procesamiento de pagos que permite **observar y probar cómo se conserva la consistencia financiera ante fallos de red, respuestas tardías, duplicación de solicitudes y caída de dependencias**. Se combinan Java 25, Spring Boot 4.1, Resilience4j y servicios AWS emulados por Floci. Se utiliza como base la plantilla hexagonal adjunta; se conserva la separación entre dominio, casos de uso, puertos, adaptadores y configuración, y se amplía a tres contextos de negocio bajo `pe.axiz`.
+Se implementa una plataforma local de pagos cuyo **caso de uso técnico es probar una arquitectura de microservicios sobre Floci**: se aprovisionan recursos mediante APIs AWS, se utilizan clientes AWS SDK reales y se separan las identidades de ejecución y los datos de cada contexto. Se prueban API Gateway, Aurora PostgreSQL, SNS/SQS, MSK, DynamoDB, S3, Secrets Manager, Parameter Store, ElastiCache Redis, EKS, IAM, STS, KMS y CloudWatch.
 
-El caso funcional contempla un comercio que solicita una autorización mediante un token, un adquirente que decide la operación y un servicio de liquidación que registra los asientos y publica un comprobante firmado. Se utilizan datos sintéticos. No se reciben PAN, CVV ni datos personales.
+Se conservan **dos microservicios REST**: `payment-service` registra órdenes de pago y `settlement-service` procesa liquidación, comprobantes y auditoría. La separación permite comprobar comunicación asíncrona y permisos distintos sin añadir un servicio dedicado a simular fallos. `platform` es una biblioteca compartida; no se ejecuta ni despliega como servicio.
 
-## Comportamiento funcional
+## Caso funcional
 
-- Se valida el monto, la moneda y la política del comercio almacenada en Parameter Store y cacheada en Redis.
-- Se reserva el pago con una clave de idempotencia persistente por comercio. Se devuelve la operación existente ante un replay y HTTP 409 si cambia su contenido.
-- Se solicita autorización al adquirente con el mismo identificador en todos los intentos. DynamoDB evita duplicar la autorización.
-- Se registra `AUTHORIZED` o `DECLINED` y se escribe el outbox en la misma transacción PostgreSQL. Una respuesta incierta conserva `UNKNOWN`; nunca se transforma una indisponibilidad en autorización.
-- Se entrega cada decisión a SNS, MSK y EventBridge con reintentos independientes. SNS FIFO distribuye a SQS FIFO; EventBridge alimenta una cola de auditoría.
-- Se procesa SQS después de persistir un inbox deduplicado, los asientos balanceados y el outbox de comprobantes. Se elimina el mensaje después del commit.
-- Se firma el comprobante mediante KMS, se almacena en S3 y se actualiza la proyección DynamoDB. Una caída durante este tramo se recupera desde el outbox.
-- Se concilian pagos pendientes mediante consulta al adquirente. Un pago no encontrado permanece incierto y requiere seguimiento; no se vuelve a autorizar desde la conciliación.
+Se registra una orden tokenizada para un comercio y se consulta su límite operativo en Parameter Store, con caché Redis de 30 segundos. Se devuelve `ACCEPTED` cuando el monto cumple la política o `REJECTED` cuando supera el límite. Se utiliza `Idempotency-Key` para recuperar la misma operación sin generar eventos duplicados. El alcance financiero se limita al registro de órdenes y la contabilidad del laboratorio.
 
-## Caso tecnológico y políticas de resiliencia
+La decisión y dos entregas outbox se confirman en la misma transacción PostgreSQL. SNS/SQS transporta la orden hacia liquidación; MSK conserva el flujo para auditoría. En liquidación se registra inbox, se generan dos asientos balanceados para pagos aceptados y se prepara el comprobante. Los pagos rechazados reciben un comprobante sin asientos. Se firma el contenido con KMS, se publica en S3 y se actualiza la proyección de consulta en DynamoDB.
 
-Resilience4j se integra mediante composición explícita de sus APIs. Se evitan dependencias de un starter de otra generación de Spring y la ambigüedad de orden de aspectos.
+## Qué se demuestra con Floci
 
-| Mecanismo | Aplicación | Comportamiento observable |
+| Capacidad | Aplicación en la PoC | Comprobación |
 |---|---|---|
-| Circuit breaker | Comunicación con adquirente | Ventana de 10 intentos, mínimo de 4, umbral de fallos de 50%, llamadas lentas de 600 ms y umbral de lentitud de 60%. Se habilitan dos sondas HALF_OPEN y transición automática. |
-| Retry | Intentos de autorización y consulta | Se reintentan fallos transitorios y timeout con backoff exponencial desde 100 ms y jitter de 50%. Se conserva el identificador financiero. No se reintentan reglas comerciales ni rechazo por capacidad. |
-| TimeLimiter | Cada intento saliente | Se cancela el Future al vencer el plazo; HttpClient aplica también un deadline propio. Se verifica la interrupción de trabajo en las pruebas. |
-| Semaphore bulkhead | Trabajo HTTP concurrente | Se limita el número de llamadas activas sin cola de espera. El permiso se conserva mientras el trabajo continúa y se libera al finalizar. |
-| Thread pool bulkhead | Publicación de outbox | Se aíslan dos hilos y una cola de ocho tareas. Se mantiene el evento pendiente cuando se agota la capacidad. |
-| Rate limiter | Ingreso y llamadas salientes | Se limita la tasa por instancia. HTTP 429 incluye `Retry-After`. Los reintentos cuentan como intentos salientes. |
-| Degradación controlada | Redis | Se consulta SSM cuando la caché falla; se conserva la política comercial como fuente autoritativa. |
-| Recuperación durable | Outbox e inbox | Se emplean leases de 60 segundos, `SKIP LOCKED`, reintentos persistidos y confirmación posterior al commit. |
-| Observabilidad | Micrometer, Prometheus y CloudWatch | Se exponen métricas y un buffer acotado de los últimos 100 eventos de resiliencia. Se propaga `X-Correlation-Id`. |
+| APIs AWS y descubrimiento | Se crean recursos con boto3; los servicios usan AWS SDK Java v2 | Se conservan ARN, endpoints y región descubiertos en `.runtime/` |
+| API Gateway HTTP API | Se enrutan las cinco operaciones públicas de pagos y liquidación | Se comprueba proxy HTTP, parámetros de ruta y reenvío de `X-Api-Key` |
+| Aurora PostgreSQL | Se crean un cluster, dos usuarios y dos esquemas | Se comprueban tokens IAM, TLS `verify-full` y aislamiento SQL |
+| IAM, STS y OIDC | Se crea un rol por ServiceAccount con sujeto y audiencia exigidos | Se acepta el sujeto propio y se rechaza el de otro servicio |
+| EKS | Se despliegan dos ServiceAccounts, Deployments y Services en k3s administrado por Floci | Se consultan pods y el rol efectivo desde `/internal/platform` |
+| SNS/SQS FIFO | Se distribuyen eventos con grupo y deduplicación estables | Se confirma SQS después del commit; se dispone de DLQ tras cinco recepciones fallidas |
+| MSK | Se publica Kafka con `acks=all` e idempotencia del productor | Se consulta una auditoría persistida por el consumidor con partición y offset |
+| DynamoDB | Se materializan comprobantes y auditoría independiente | Se utiliza escritura condicional para impedir cambios del mismo evento |
+| Secrets Manager y SSM | Se almacenan claves de API y políticas del comercio | Se recuperan con credenciales temporales del rol correspondiente |
+| Redis administrado | Se consulta ElastiCache mediante su proxy | La política sigue disponible desde SSM cuando falla la caché |
+| S3 y KMS | Se guardan comprobantes versionados y firmas RSA-PSS | Se verifica la firma de los bytes almacenados en S3 |
+| CloudWatch | Se envían métricas y se aprovisiona una alarma de volumen | Se consulta la configuración y se prueban permisos de publicación |
+| VPC y subnets | Se crean los recursos de red requeridos por las APIs EKS/MSK | Se reutilizan identificadores reales del plano de control emulado |
 
-El orden de ejecución es `Retry → CircuitBreaker → RateLimiter → TimeLimiter → SemaphoreBulkhead → HTTP`. El circuito observa cada intento físico; la tasa de fallos no representa operaciones financieras distintas. El presupuesto total puede incluir tres deadlines y dos pausas con jitter. Un rechazo financiero es una respuesta válida, no un fallo de disponibilidad.
-
-Los controles de tasa y concurrencia son locales a cada instancia. Se utiliza Redis para políticas de comercio, no para afirmar un límite global de solicitudes.
-
-## Servicios y tecnologías
-
-| Tecnología | Función en la PoC |
-|---|---|
-| Java 25 y Spring Boot 4.1.1 | REST, validación, hilos virtuales, cierre ordenado y Actuator. Spring Framework 7.0.9 se resuelve desde el BOM de Boot. |
-| Resilience4j 2.4.0 | Circuit breaker, retry, time limiter, bulkheads, rate limiters y métricas. |
-| AWS SDK v2 2.55.11 | Clientes compatibles con protocolos AWS, firma SigV4 y renovación de sesiones STS. |
-| Floci 2.1.0 | Emulación del plano de control y APIs AWS; ejecución real de los motores de base de datos, caché, Kafka y Kubernetes. |
-| API Gateway HTTP API | Entrada común para pagos, conciliación y consultas de liquidación. Se reenvía la clave de API al servicio. |
-| Aurora PostgreSQL emulado | Registro transaccional, outbox, inbox y contabilidad. Se ejecuta PostgreSQL 18.6; no se reproduce el almacenamiento distribuido de Aurora. |
-| SQS y SNS FIFO | Distribución de decisiones, visibilidad, confirmación y DLQ tras cinco entregas fallidas. |
-| DynamoDB | Autorizaciones idempotentes con escritura condicional y lectura consistente; proyección de liquidaciones. |
-| S3 y KMS | Comprobantes con clave determinista, versionado y firma RSA-PSS-SHA256. |
-| Secrets Manager y SSM | Claves de API e internas y política del comercio. |
-| MSK emulado | Publicación Kafka con clave de pago, `acks=all` e idempotencia del productor; Floci ejecuta Redpanda 26.2.3. |
-| ElastiCache emulado | Caché de políticas mediante Redis 8.8.3 y TTL de 30 segundos. |
-| EKS, IAM y STS | Pods en k3s 1.35.9, ServiceAccounts independientes, trust policies por sujeto y sesiones temporales. |
-| VPC y subnets | Metadatos de red requeridos por EKS y MSK; el tráfico local circula por la red Docker. |
-| EventBridge y CloudWatch | Auditoría de decisiones, métricas por servicio y alarma de volumen de solicitudes. |
-| Flyway 12.4.0 | Migraciones versionadas como único mecanismo de creación de tablas. |
-| Maven 3.10.0 y Spotless | Compilación reproducible y formato Google Java Format 1.33.0. |
-
-Se incluyen únicamente servicios relacionados con identidad, procesamiento, persistencia, mensajería, auditoría y operación del caso. No se aprovisiona una segunda base RDS cuando se utiliza el clúster Aurora emulado.
+Se mantienen únicamente recursos asociados al flujo. Aurora cubre el almacenamiento relacional; se evita crear una instancia RDS adicional. El flujo de auditoría se implementa con MSK y no necesita otro bus ni una cola sin consumidor.
 
 ## Arquitectura
 
 ```mermaid
 flowchart TD
-    Client["Cliente"] --> Gateway["API Gateway"]
-    Gateway --> Payment["Payment service"]
-    Gateway --> Settlement["Settlement service"]
-    subgraph Runtime["Pods EKS o procesos locales"]
-        Payment --> Acquirer["Acquirer service"]
-        Payment --> Policy["SSM y Redis"]
-        Acquirer --> Auth["DynamoDB autorizaciones"]
-        Payment --> PgPay["Aurora: esquema payment"]
-        PgPay --> Outbox["Outbox con leases"]
-        Outbox --> SNS["SNS FIFO"]
-        SNS --> SQS["SQS FIFO y DLQ"]
-        SQS --> Settlement
-        Settlement --> PgLedger["Aurora: esquema settlement"]
-        PgLedger --> Receipt["Outbox de comprobantes"]
-        Receipt --> KMS["KMS: firma"]
-        Receipt --> S3["S3: comprobantes"]
-        Receipt --> Projection["DynamoDB liquidaciones"]
-        Outbox --> MSK["MSK: auditoría Kafka"]
-        Outbox --> Events["EventBridge y cola de auditoría"]
-    end
-    Roles["ServiceAccount, OIDC y STS"] --> Payment
-    Roles --> Settlement
-    Roles --> Acquirer
-    Secrets["Secrets Manager"] --> Runtime
-    Runtime --> Metrics["Micrometer y CloudWatch"]
+  Client["Cliente REST"] --> Gateway["API Gateway de Floci"]
+  Gateway --> Payment["Pod: pagos"]
+  Gateway --> Settlement["Pod: liquidación"]
+  subgraph Identity["Identidad por ServiceAccount"]
+    OIDC["OIDC de Floci"] --> STS["STS: roles temporales"]
+  end
+  STS --> Payment
+  STS --> Settlement
+  Payment --> Policy["SSM y Redis"]
+  Payment --> PaymentDB["Aurora: payment y outbox"]
+  PaymentDB --> Publisher["Publicador outbox de pagos"]
+  Publisher --> Queue["SNS FIFO y SQS FIFO"]
+  Publisher --> Stream["MSK: eventos de pagos"]
+  Queue --> Settlement
+  Stream --> Settlement
+  Settlement --> Ledger["Aurora: inbox y ledger"]
+  Ledger --> Receipt["KMS y S3: comprobantes"]
+  Settlement --> Projection["DynamoDB: consulta y auditoría"]
+  Receipt --> Projection
 ```
 
-Cada servicio mantiene su dominio y sus puertos. Se comparte un clúster físico para reducir el coste local, con esquemas y usuarios separados. No se consulta el esquema de otro contexto desde un servicio.
+API Gateway y las APIs AWS se emulan dentro de Floci. Floci crea contenedores reales para PostgreSQL, Redis y Redpanda; en el modo EKS también crea k3s. No se declara otro PostgreSQL, Redis o Kafka en Compose porque se duplicaría la infraestructura administrada por el emulador. Secrets Manager y CloudWatch se consumen desde los dos servicios.
+
+## Tecnologías y versiones
+
+| Tecnología | Versión | Uso |
+|---|---|---|
+| Java | 25; imagen Temurin `25.0.4.1_1` | Records, threads virtuales y compilación `release 25` |
+| Spring Boot / Spring Framework | 4.1.1 / 7.0.9 | REST MVC, validación, configuración y ciclo de vida |
+| Maven | 3.10.0 | Reactor y wrapper Linux con verificación SHA-512 |
+| AWS SDK Java | 2.55.11 | Clientes AWS y credenciales de identidad web |
+| Floci | 2.1.0 | Plano de control AWS y motores locales administrados |
+| PostgreSQL / JDBC | 18.6 / 42.7.13 | Motor de Aurora emulado y conexiones IAM |
+| Flyway | 12.4.0 | Migraciones por esquema durante bootstrap |
+| Kafka client / Redpanda | 4.2.1 / 26.2.3 | Productor y consumidor del MSK emulado |
+| Redis | 8.8.3 | Motor del ElastiCache emulado |
+| k3s | 1.35.9-k3s1 | Kubernetes del EKS emulado |
+| Jackson | 3.1.5 | JSON con la API `tools.jackson` de Spring Boot 4 |
+| Spotless / Google Java Format | 3.0.0 / 1.33.0 | Formato Java comprobado durante `verify` |
+| boto3 / psycopg | 1.43.108 / 3.3.6 | Aprovisionamiento y validación AWS/PostgreSQL |
+
+Se heredan las versiones compatibles de Spring, Jackson, JDBC, Flyway y Kafka desde el BOM de Spring Boot. Se importan las versiones AWS desde su BOM. Se seleccionan clientes SDK directos para evitar introducir una integración Spring Cloud AWS sin compatibilidad comprobada con Spring Boot 4.1.
 
 ## Estructura del proyecto
 
 | Carpeta o archivo | Contenido |
 |---|---|
-| `platform/` | Identidad AWS, datasource IAM, filtros de autenticación, correlación, catálogo REST y métricas. |
-| `payment-service/` | Agregado de pago, Money, casos de uso, adaptadores JDBC/HTTP/SSM/Redis y publicación outbox. |
-| `acquirer-service/` | Dominio de autorización, persistencia DynamoDB y simulador controlado de fallos. |
-| `settlement-service/` | Consumo SQS, inbox, contabilidad y publicación de comprobantes. |
-| `infrastructura/` | Compose, imágenes base, aprovisionamiento, despliegue EKS, verificaciones AWS y ejemplos JSON de requests/responses. |
-| `datasets/` | Pagos sintéticos y carga idempotente mediante REST. |
-| `scripts/` | Construcción, ejecución en host, pruebas y catálogo de rutas. |
-| `validation/` | Evidencia de compilación y pruebas en formato de salida de herramientas. |
-| `.env.example`, `application.yml.example` | Ejemplos comentados de configuración. |
-| `pom.xml`, `mvnw` | Reactor Maven y lanzador Linux con verificación SHA-512 de la distribución. |
+| `payment-service/` | Dominio de órdenes, casos de uso, REST, PostgreSQL, SSM/Redis y publicador SNS/Kafka |
+| `settlement-service/` | Dominio contable, consumidores SQS/Kafka, ledger, comprobantes S3/KMS y proyecciones DynamoDB |
+| `platform/` | Biblioteca de identidad web, datasource IAM, filtros HTTP, métricas y catálogo de rutas |
+| `infrastructura/` | Compose, imágenes base, bootstrap AWS, despliegue EKS, pruebas AWS y ejemplos JSON |
+| `datasets/` | Pagos de ejemplo y precarga idempotente mediante la API |
+| `scripts/` | Construcción, ejecución host, descubrimiento DNS, pruebas y rutas |
+| `validation/` | Registros y resultados de comprobaciones ejecutadas |
+| `.env.example`, `application.yml.example` | Ejemplos de configuración y comentarios sobre los valores admitidos |
+| `pom.xml`, `mvnw` | Reactor Maven importable en el IDE y lanzador Linux |
+
+Se utiliza el paquete raíz `pe.axiz`. Se conserva la organización hexagonal de la plantilla: `domain`, `application/ports`, `application/service`, `adapters/in`, `adapters/out` y `configuration`. El dominio no depende de Spring ni de AWS.
 
 ## Código principal
 
-`PaymentService` implementa los casos de uso sin dependencias de Spring. `Money` normaliza la precisión monetaria y `Payment` impide reemplazar una decisión final incompatible. `JdbcPaymentStore` reserva la idempotencia con una restricción única y persiste decisión y outbox en una transacción.
+`PaymentService` valida la orden, calcula una huella SHA-256, recupera replays y evalúa la política del comercio. `JdbcPaymentStore.record` inserta pago y outbox en una transacción; la restricción única protege carreras con la misma clave. Un replay idéntico no vuelve a consultar SSM. La reutilización de la clave con otro contenido devuelve HTTP 409.
 
-`HttpAuthorizationAdapter` envía el mismo identificador en cada intento. `ResiliencePolicies` conserva registros compartidos por servicio, compone las políticas y registra sus eventos. `OutboxPublisher` reclama eventos sin mantener una transacción abierta durante llamadas de red.
+`OutboxPublisher` reserva entregas con `FOR UPDATE SKIP LOCKED`, libera la transacción antes de usar la red y confirma cada destino por separado. Se aplica una reserva temporal de 60 segundos y un reintento persistido con espera hasta 60 segundos. Un fallo de SNS no marca Kafka como confirmado ni elimina la decisión.
 
-`DynamoAuthorizationStore` utiliza `attribute_not_exists(pk)` y verifica el contenido de un replay. `JdbcLedger` confirma inbox, débito, crédito y outbox de comprobante de manera atómica. `ReceiptPublisher` firma, publica y proyecta con reintentos durables; se pueden generar nuevas versiones S3 del mismo comprobante durante una recuperación.
+`SettlementConsumer` procesa SQS con visibilidad de 30 segundos. `JdbcLedger` confirma inbox, asientos y outbox de comprobante en una única transacción. La confirmación SQS se realiza después del commit. Se preserva el mensaje ante un fallo para reintento o DLQ.
 
-`IamDataSource` genera un token RDS nuevo para cada conexión física. Hikari conserva conexiones, no una contraseña IAM estática. Se verifica la CA y el nombre del endpoint mediante TLS. Flyway se ejecuta durante el bootstrap como propietario; los usuarios de aplicación reciben permisos DML y uso de secuencias, sin creación de tablas.
+`PaymentAuditConsumer` consume MSK con auto commit deshabilitado. `DynamoAuditStore` registra el evento con `attribute_not_exists(pk)`; un replay conserva su primera posición y un cambio de contenido se rechaza. Se confirma el offset después de persistir. Un fallo reposiciona la partición sin confirmar el registro; un evento inválido bloquea esa partición hasta su corrección operativa.
 
-## Requisitos en Fedora WSL
+`ReceiptPublisher` firma exactamente los bytes del evento y publica la clave determinista `receipts/{paymentId}.json` con metadatos de firma. La tabla de proyección se actualiza antes de confirmar el outbox de comprobante. S3 puede conservar nuevas versiones durante una recuperación.
 
-Se requiere Fedora WSL con systemd, Docker Engine Linux accesible mediante `/var/run/docker.sock`, Compose v2 con soporte de `additional_contexts`, Java 25, Python 3 y curl. Para el despliegue EKS se requiere capacidad de iniciar contenedores privilegiados. Se recomienda reservar 12 GiB de RAM para los motores y los pods.
+`AwsConfiguration` usa `StsWebIdentityTokenFileCredentialsProvider` con renovación asíncrona. `IamDataSource` genera un token RDS al crear cada conexión física; Hikari conserva conexiones, no una contraseña IAM estática. Se verifica la CA y el hostname con TLS. `PlatformIdentityController` muestra el rol asumido, el usuario PostgreSQL, el esquema y el estado TLS sin revelar credenciales.
 
-Se utiliza Docker Engine dentro de Fedora WSL en la modalidad de aplicaciones en host. La conexión directa al broker mediante su IP de bridge requiere esa topología; Docker Desktop con daemon externo puede requerir otra ruta de red.
+## Preparación en Fedora WSL
+
+Se requiere JDK 25, Python 3, curl, Docker Engine con Compose v2 y conectividad para descargar dependencias e imágenes. En WSL se habilita systemd y se utiliza un daemon Docker accesible desde la distribución. Se recomienda asignar 8 GB de memoria al laboratorio y más capacidad al modo EKS.
 
 ```bash
-sudo dnf install -y java-25-openjdk-devel python3 curl tar gzip
-sudo systemctl start docker
-java -version
+sudo dnf install java-25-openjdk-devel python3 curl
 docker version
 docker compose version
 cp .env.example .env
@@ -134,21 +120,64 @@ chmod +x mvnw scripts/*.sh datasets/*.sh
 mkdir -p .runtime
 ```
 
-Se instala Docker Engine y su plugin Compose siguiendo la [guía oficial para Fedora](https://docs.docker.com/engine/install/fedora/) si todavía no están disponibles. Se ejecutan todos los comandos siguientes desde la raíz del proyecto. Los scripts y fuentes Python se revisan con ShellCheck y Ruff; se incluyen estilos y comprobaciones sintácticas en el flujo de pruebas.
+Se instala Docker según la [guía oficial para Fedora](https://docs.docker.com/engine/install/fedora/) si todavía no está disponible. Se ejecutan todos los comandos desde la raíz. La configuración se consulta en los archivos de ejemplo.
 
-## Construcción de las imágenes reutilizables
+## Imágenes base reutilizables
 
-Se construye primero la imagen Java con Maven y dependencias descargadas; se reutiliza en los builds de las aplicaciones. La imagen de herramientas incorpora boto3 y las utilidades de aprovisionamiento. Una ejecución con `--no-build` conserva estas imágenes y no recompila código.
+Se construye primero una imagen Java que contiene Maven y las dependencias del reactor. Sólo se copian los POM en esa etapa, por lo que los cambios de código no invalidan la descarga de dependencias. Se construyen después las imágenes de herramientas y de los dos servicios:
 
 ```bash
 bash scripts/build-base.sh
 ```
 
-Se pueden importar los módulos desde `pom.xml` en el IDE con JDK 25. La compilación sin contenedores se realiza con:
+La imagen de herramientas contiene boto3, psycopg, Docker CLI y las migraciones. Las imágenes de aplicación compilan offline sobre la base y ejecutan JRE con usuario no root. `--no-build` permite reutilizarlas.
+
+Se importa el `pom.xml` raíz en el IDE y se selecciona JDK 25. La compilación local se realiza con:
 
 ```bash
 ./mvnw -B -ntp verify
 ```
+
+## Ejecución en EKS administrado por Floci
+
+Se utiliza este modo para comprobar las conexiones a Aurora desde pods y ServiceAccounts. Después de construir las imágenes se inicia la infraestructura y el despliegue en primer plano:
+
+```bash
+docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --build
+```
+
+Se pueden reutilizar las imágenes existentes:
+
+```bash
+docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --no-build
+```
+
+El bootstrap crea recursos AWS, CA, roles, esquemas y migraciones. `eks.py` importa las imágenes locales a containerd, aplica ServiceAccounts, Deployments y Services, espera readiness, precarga pagos y muestra las rutas. Se conserva el manifiesto aplicado en `.runtime/deployment.local.yml`. Se incluyen huellas de imagen y configuración en el pod para provocar un rollout al actualizar el código o la CA. Cuando cambia Java se reconstruyen las imágenes con `bash scripts/build-base.sh` antes del despliegue.
+
+Se utilizan `axiz-payment` y `axiz-settlement` en el namespace `axiz`. Cada trust policy exige `system:serviceaccount:axiz:<service-account>` y audiencia `sts.amazonaws.com`. Se limita `rds-db:connect` al recurso del cluster y al usuario de cada contexto. Las aplicaciones no reciben claves AWS permanentes ni la contraseña de administración SQL.
+
+**Particularidad de Floci:** se obtiene el JWT firmado del endpoint OIDC local del emulador mediante un init container y un renovador. Se utilizan el ServiceAccount y namespace efectivos del pod mediante Downward API y un volumen en memoria. Este emisor local no atesta la identidad de un pod AWS real. La adaptación a AWS EKS utiliza tokens proyectados de Kubernetes; se incluye `infrastructura/kubernetes/aws-irsa-patch.yml` como base de esa adaptación. Se requieren ARN, endpoints, CA e imágenes publicados en el entorno AWS real.
+
+```bash
+docker exec floci-eks-axiz-payments k3s kubectl -n axiz get pods
+docker exec floci-eks-axiz-payments k3s kubectl -n axiz logs deployment/axiz-payment -c payment
+```
+
+## Ejecución completa con Compose
+
+Se inicia infraestructura, aplicaciones, migraciones, renovación de identidad, precarga y rutas en un solo comando:
+
+```bash
+docker compose -f infrastructura/compose.yml --profile full up --build
+```
+
+Se reutilizan las imágenes sin compilación con:
+
+```bash
+docker compose -f infrastructura/compose.yml --profile full up --no-build
+```
+
+En esta modalidad EKS mantiene metadatos y emisión OIDC para el laboratorio; no se crean pods. Los servicios se ejecutan en Compose con roles temporales. El archivo del modo EKS activa el motor Kubernetes real.
 
 ## Infraestructura en Compose y aplicaciones en host
 
@@ -158,306 +187,250 @@ Se mantiene la infraestructura en primer plano en una terminal:
 docker compose -f infrastructura/compose.yml -f infrastructura/compose.host.yml up --build
 ```
 
-Se espera el mensaje de aprovisionamiento completado. En otra terminal se registra el nombre anunciado por el broker en el DNS del host y se ejecutan los tres servicios:
+Después del mensaje de aprovisionamiento completado, se utiliza otra terminal para registrar el broker anunciado e iniciar los dos servicios:
 
 ```bash
 sudo bash scripts/host-dns.sh
 bash scripts/run-host.sh
 ```
 
-Se mantienen la infraestructura y la renovación de tokens en ejecución. `run-host.sh` compila, inicia los servicios, precarga pagos, imprime las rutas y cierra los procesos al recibir una interrupción. La renovación de tokens se efectúa desde el contenedor `token-renewer`, no desde credenciales permanentes del host.
+`run-host.sh` compila, inicia las JVM, precarga pagos, muestra rutas y finaliza ambos procesos al recibir una interrupción. Se mantiene el renovador de identidad de Compose en ejecución. Si se reutilizan imágenes de infraestructura se sustituye `--build` por `--no-build`.
 
-## Infraestructura y aplicaciones en Compose
+## Migraciones y precarga
 
-Se levanta todo en un solo comando. Se incluyen aprovisionamiento, migraciones, servicios, renovación de tokens, precarga y catálogo de rutas:
+Flyway mantiene una historia independiente por esquema. El bootstrap crea usuarios y esquemas y ejecuta las migraciones como propietario. Los usuarios de aplicación reciben DML y uso de secuencias; se revoca el acceso a la historia Flyway y no se habilita creación de tablas. `datasets` no repite DDL ni migraciones.
 
-```bash
-docker compose -f infrastructura/compose.yml --profile full up --build
-```
-
-Para reutilizar las imágenes construidas:
-
-```bash
-docker compose -f infrastructura/compose.yml --profile full up --no-build
-```
-
-El contenedor de precarga termina con código 0. Los servicios permanecen en primer plano. No se habilita access logging de sondas ni se imprimen resultados de health checks de forma continua.
-
-## Despliegue en EKS emulado y acceso por roles desde pods
-
-Después de construir las imágenes, se inicia el despliegue Kubernetes:
-
-```bash
-docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --build
-```
-
-Para reutilizar las imágenes:
-
-```bash
-docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --no-build
-```
-
-Si se modifica código Java, se reconstruyen previamente las imágenes con `bash scripts/build-base.sh`. El despliegue importa las imágenes locales a containerd, aplica ServiceAccounts, Deployments y Services, espera readiness, precarga pagos mediante los Services del clúster e imprime las rutas. Se conserva el manifiesto aplicado en `.runtime/deployment.local.yml`.
-
-Se utilizan `axiz-payment`, `axiz-acquirer` y `axiz-settlement` como ServiceAccounts. Cada trust policy exige el sujeto `system:serviceaccount:axiz:<service-account>` y la audiencia STS. Se acota `rds-db:connect` al recurso del clúster y al usuario PostgreSQL de cada contexto. No se inyectan claves AWS permanentes en los pods de aplicación.
-
-**Particularidad de Floci 2.1.0:** el JWT firmado para IRSA se obtiene del endpoint OIDC local documentado por Floci. Se utiliza un init container y un renovador que escribe el token en memoria compartida. No se afirma que esta emisión pruebe la atestación de un pod real de AWS. En EKS de AWS se proyecta el token de ServiceAccount mediante Kubernetes; se incluye `infrastructura/kubernetes/aws-irsa-patch.yml` como punto de partida para esa adaptación. El parche requiere configurar los recursos y ARN reales de AWS y no constituye un despliegue de producción listo para ejecutar.
-
-Se consulta el estado de los pods con:
-
-```bash
-docker exec floci-eks-axiz-payments k3s kubectl -n axiz get pods
-docker exec floci-eks-axiz-payments k3s kubectl -n axiz logs deployment/axiz-payment -c payment
-```
-
-## Endpoints en orden del flujo
-
-Se utilizan los puertos 8080 para pagos, 8081 para adquirente y 8082 para liquidación en host/Compose. En EKS se utilizan NodePorts 30080, 30081 y 30082. API Gateway expone las rutas públicas bajo el host `axiz-payments.execute-api.localhost.floci.io:4566`.
-
-| Método y ruta | Servicio | Descripción funcional | Descripción técnica |
-|---|---|---|---|
-| `GET /actuator/health/readiness` | Todos | Comprobar disponibilidad inicial | Actuator; no muestra detalles internos. |
-| `PUT /internal/faults` | Adquirente | Elegir escenario de error | Requiere `X-Internal-Key`; sólo laboratorio. |
-| `POST /api/payments` | Pagos | Solicitar autorización | Requiere `X-Api-Key`, `Idempotency-Key`; HTTP 200 para decisión final y 202 para operación pendiente o incierta. |
-| `GET /internal/authorizations/{id}` | Adquirente | Consultar resultado registrado | DynamoDB consistente; requiere clave interna. |
-| `GET /api/payments/{id}` | Pagos | Consultar el pago | Lectura del esquema payment; requiere clave de API. |
-| `POST /api/payments/{id}/reconcile` | Pagos | Resolver una respuesta incierta | Consulta al adquirente; no crea otra autorización. |
-| `GET /api/settlements/{id}` | Liquidación | Consultar estado y comprobante | Proyección DynamoDB; 404 durante consistencia eventual. |
-| `GET /api/settlements/{id}/ledger` | Liquidación | Consultar débito y crédito | Lectura del esquema settlement. |
-| `GET /internal/resilience` | Pagos | Inspeccionar estado y fallos | Circuit breaker, contadores y eventos acotados. |
-| `POST /internal/resilience/reset` | Pagos | Reiniciar el escenario | Reset del circuito; no modifica pagos ni datos. |
-| `GET /internal/faults` | Adquirente | Inspeccionar el simulador | Modo, fallos restantes y llamadas físicas. |
-| `POST /internal/authorizations` | Adquirente | Registrar autorización idempotente | Escritura condicional DynamoDB; invocación entre servicios. |
-| `GET /internal/outbox` | Pagos | Revisar entregas pendientes | Conteos independientes de SNS, Kafka y EventBridge. |
-| `GET /internal/settlement/backlog` | Liquidación | Revisar pendientes de comprobantes | Conteo de inbox y receipt outbox. |
-| `GET /actuator/health/liveness` | Todos | Comprobar vida del proceso | Sonda independiente de fallos del adquirente. |
-| `GET /actuator/metrics` | Todos | Explorar métricas | Micrometer; `/actuator/metrics/{nombre}` devuelve una métrica. |
-| `GET /actuator/prometheus` | Todos | Exportar métricas | Formato Prometheus sin añadir otro servidor. |
-| `GET /routes` | Todos | Consultar rutas registradas | Catálogo generado desde Spring MVC. |
-
-## Precarga y pruebas por curl
-
-Se incluyen tres pagos en `datasets/payments.json`. La carga automática utiliza claves estables; ejecutarla nuevamente conserva los mismos pagos. Para repetirla en host o Compose:
+Se precargan tres órdenes aceptadas del comercio `merchant-demo`, con claves de idempotencia estables. Se conserva el resultado en `.runtime/dataset-results.json`. Se puede repetir la precarga desde la raíz:
 
 ```bash
 bash datasets/seed.sh
 ```
 
-Se recuperan las claves locales sin escribirlas en el código:
+En EKS se utiliza:
 
 ```bash
+bash datasets/seed.sh http://localhost:30080
+```
+
+Se utiliza un volumen `floci-data-v2` para este modelo. Al sustituir una versión anterior se detiene primero su stack y se utiliza un despliegue nuevo; no se aplica este esquema inicial sobre la historia Flyway anterior.
+
+## Endpoints en orden del flujo
+
+| Método y ruta | Servicio | Función | Descripción técnica |
+|---|---|---|---|
+| `GET /actuator/health/readiness` | Ambos | Comprobar arranque | Actuator, sin detalles internos |
+| `GET /internal/platform` | Ambos | Comprobar rol y conexión a Aurora | STS, `current_user`, esquema y TLS; `X-Internal-Key` |
+| `POST /api/payments` | Pagos | Registrar una orden | `X-Api-Key`, `Idempotency-Key`; decisión y outbox atómicos; HTTP 200 |
+| `GET /api/payments/{id}` | Pagos | Consultar la orden | Lectura PostgreSQL; `X-Api-Key` |
+| `GET /api/settlements/{id}` | Liquidación | Consultar comprobante | Lectura consistente DynamoDB; 404 mientras se materializa |
+| `GET /api/settlements/{id}/ledger` | Liquidación | Consultar asientos | Lectura del esquema propio; array vacío para rechazo |
+| `GET /api/settlements/{id}/audit` | Liquidación | Consultar auditoría MSK | DynamoDB con payload original, partición y offset |
+| `GET /internal/outbox` | Pagos | Revisar entregas SNS/Kafka | Totales y pendientes por destino; `X-Internal-Key` |
+| `GET /internal/settlement/backlog` | Liquidación | Revisar pendientes | Conteos inbox y comprobantes; `X-Internal-Key` |
+| `GET /actuator/health/liveness` | Ambos | Comprobar vida del proceso | Sonda independiente del negocio |
+| `GET /actuator/metrics` | Ambos | Consultar métricas | Micrometer; se consulta una métrica en `/actuator/metrics/{nombre}` |
+| `GET /actuator/prometheus` | Ambos | Exportar métricas | Texto Prometheus, sin desplegar otro servidor |
+| `GET /actuator/info` | Ambos | Consultar metadatos Actuator | HTTP 200; objeto vacío si no hay contribuciones configuradas |
+| `GET /routes` | Ambos | Listar rutas al terminar el arranque | Catálogo de mappings REST |
+
+Las rutas `/api/settlements/**` requieren `X-Api-Key`. Los puertos host/Compose son 8080 y 8081; los NodePorts EKS son 30080 y 30081. API Gateway publica las cinco rutas `/api/**` de la tabla. Se utilizan `X-Api-Key` y `X-Internal-Key` cargadas desde Secrets Manager al inicio; su rotación requiere reiniciar los servicios. Se propaga `X-Correlation-Id` o se genera un UUID cuando falta.
+
+## Pruebas por curl
+
+Se preparan las rutas para host/Compose y se cargan las claves generadas:
+
+```bash
+payment=http://localhost:8080
+settlement=http://localhost:8081
 api_key=$(cat .runtime/api-key)
 internal_key=$(cat .runtime/internal-key)
-payment=http://localhost:8080
-acquirer=http://localhost:8081
-settlement=http://localhost:8082
+key="curl-$(date +%s%N)"
 ```
 
-En EKS con Docker Engine Linux se obtienen las direcciones de prueba del nodo:
+En EKS se seleccionan las rutas de los Services:
 
 ```bash
-node_ip=$(docker inspect floci-eks-axiz-payments --format '{{(index .NetworkSettings.Networks "axiz-network").IPAddress}}')
-payment="http://$node_ip:30080"
-acquirer="http://$node_ip:30081"
-settlement="http://$node_ip:30082"
+payment=http://localhost:30080
+settlement=http://localhost:30081
 ```
 
-### Autorización y replay
+### Identidad efectiva y conexión SQL
 
-Se solicita un pago. Se normaliza el monto, se valida el comercio y se consulta al adquirente:
+Se consulta STS con el rol del servicio y se comprueba la sesión PostgreSQL. El request no tiene body:
 
 ```bash
-curl -fsS -X POST "$payment/api/payments" \
-  -H "X-Api-Key: $api_key" -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: curl-payment-001' \
-  -d @infrastructura/requests/payment.json
+curl -fsS "$payment/internal/platform" -H "X-Internal-Key: $internal_key"
 ```
 
-Respuesta representativa HTTP 200; los identificadores se generan en ejecución:
+Se devuelve una respuesta equivalente a:
 
 ```json
-{"id":"592db17b-b4f5-4d53-a8ef-5b6dcf64e76a","merchantId":"merchant-demo","amount":25.50,"currency":"PEN","status":"AUTHORIZED","authorizationCode":"AX592db17b"}
+{"awsRole":"arn:aws:sts::000000000000:assumed-role/axiz-payment/payment-service","account":"000000000000","database":{"username":"axiz_payment","schema":"payment","tls":true}}
 ```
 
-Se repite el mismo comando para comprobar que se devuelve el mismo `id` sin otra autorización. Se cambia el monto manteniendo la clave para obtener HTTP 409 con ProblemDetail:
+### Registro e idempotencia
+
+Se registra una orden conforme al límite del comercio:
 
 ```bash
-curl -i -X POST "$payment/api/payments" \
-  -H "X-Api-Key: $api_key" -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: curl-payment-001' \
-  -d '{"merchantId":"merchant-demo","amount":26,"currency":"PEN","token":"tok_demo"}'
+result=$(curl -fsS -X POST "$payment/api/payments" \
+  -H "X-Api-Key: $api_key" -H "Idempotency-Key: $key" \
+  -H 'Content-Type: application/json' -d @infrastructura/requests/payment.json)
+printf '%s\n' "$result"
+id=$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 ```
+
+El request contiene `merchantId`, `amount`, `currency` y `token`. Se devuelve HTTP 200:
 
 ```json
-{"type":"about:blank","title":"Conflict","status":409,"detail":"La clave de idempotencia ya se utilizó con otra solicitud"}
+{"id":"cb5f377e-80db-4d35-aea6-c0acbe7e2d2e","merchantId":"merchant-demo","amount":25.50,"currency":"PEN","status":"ACCEPTED","reason":"POLICY_ACCEPTED"}
 ```
 
-### Recuperación mediante reintentos
-
-Se configuran dos fallos transitorios antes de autorizar:
+Se repite exactamente el request para obtener el mismo identificador y conservar una sola decisión y dos entregas outbox:
 
 ```bash
-curl -fsS -X PUT "$acquirer/internal/faults" \
-  -H "X-Internal-Key: $internal_key" -H 'Content-Type: application/json' \
-  -d @infrastructura/requests/fault-transient.json
-curl -fsS -X POST "$payment/internal/resilience/reset" -H "X-Internal-Key: $internal_key"
 curl -fsS -X POST "$payment/api/payments" \
-  -H "X-Api-Key: $api_key" -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: curl-payment-retry' -d @infrastructura/requests/payment.json
-curl -fsS "$acquirer/internal/faults" -H "X-Internal-Key: $internal_key"
+  -H "X-Api-Key: $api_key" -H "Idempotency-Key: $key" \
+  -H 'Content-Type: application/json' -d @infrastructura/requests/payment.json
 ```
 
-Se espera un pago `AUTHORIZED` y un contador `calls` de 3. La respuesta del simulador contiene `{"mode":"TRANSIENT","remaining":0,"calls":3}`.
-
-### Respuesta perdida después de autorizar
-
-Se registra la autorización y se demora la respuesta más allá del deadline:
+Se modifica el monto manteniendo la clave para comprobar HTTP 409:
 
 ```bash
-curl -fsS -X PUT "$acquirer/internal/faults" \
-  -H "X-Internal-Key: $internal_key" -H 'Content-Type: application/json' \
-  -d @infrastructura/requests/fault-unknown.json
-curl -fsS -X POST "$payment/internal/resilience/reset" -H "X-Internal-Key: $internal_key"
-curl -fsS -X POST "$payment/api/payments" \
-  -H "X-Api-Key: $api_key" -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: curl-payment-unknown' -d @infrastructura/requests/payment.json
+curl -sS -i -X POST "$payment/api/payments" \
+  -H "X-Api-Key: $api_key" -H "Idempotency-Key: $key" \
+  -H 'Content-Type: application/json' \
+  -d '{"merchantId":"merchant-demo","amount":26.00,"currency":"PEN","token":"tok_demo"}'
 ```
 
-Se espera HTTP 202 con `status: UNKNOWN` y `authorizationCode: null`. Se conserva el `id` devuelto y se consulta la decisión, después de restaurar el simulador:
+Se devuelve un ProblemDetail con `status: 409` y detalle de reutilización de la clave. Un campo inválido produce 400; una indisponibilidad AWS/SQL durante el registro produce 503 y no se confirma una orden incompleta.
+
+### Acceso a través de API Gateway
+
+Se utiliza el host virtual de Floci para seleccionar la API. El request GET no tiene body y devuelve la misma orden:
 
 ```bash
-id=ID_DEVUELTO
-curl -fsS -X PUT "$acquirer/internal/faults" \
-  -H "X-Internal-Key: $internal_key" -H 'Content-Type: application/json' \
-  -d @infrastructura/requests/fault-success.json
-curl -fsS -X POST "$payment/internal/resilience/reset" -H "X-Internal-Key: $internal_key"
-curl -fsS -X POST "$payment/api/payments/$id/reconcile" -H "X-Api-Key: $api_key"
+curl -fsS "http://localhost:4566/api/payments/$id" \
+  -H 'Host: axiz-payments.execute-api.localhost.floci.io' -H "X-Api-Key: $api_key"
 ```
 
-Se espera HTTP 200 con `AUTHORIZED` y la autorización previamente registrada. También se ejecuta una conciliación automática cada 30 segundos para operaciones cuya última modificación supera 30 segundos.
+### Liquidación, comprobante y auditoría
 
-### Circuit breaker y rechazo financiero
-
-Se fuerzan fallos suficientes para abrir el circuito y se envían dos pagos con claves diferentes:
-
-```bash
-curl -fsS -X PUT "$acquirer/internal/faults" \
-  -H "X-Internal-Key: $internal_key" -H 'Content-Type: application/json' \
-  -d '{"mode":"TRANSIENT","failures":100,"delayMs":0}'
-curl -fsS -X POST "$payment/internal/resilience/reset" -H "X-Internal-Key: $internal_key"
-for key in curl-circuit-001 curl-circuit-002; do
-  curl -fsS -X POST "$payment/api/payments" \
-    -H "X-Api-Key: $api_key" -H 'Content-Type: application/json' \
-    -H "Idempotency-Key: $key" -d @infrastructura/requests/payment.json
-done
-curl -fsS "$payment/internal/resilience" -H "X-Internal-Key: $internal_key"
-```
-
-Se espera `state: OPEN`. El siguiente pago conserva estado incierto y no alcanza el adquirente. Se restaura `SUCCESS` y se deja transcurrir la espera configurada para observar HALF_OPEN y las sondas de recuperación; alternativamente, se reinicia el circuito para otro escenario independiente.
-
-Para un rechazo de negocio se configura `{"mode":"DECLINE","failures":0,"delayMs":0}` mediante el mismo endpoint y se envía un pago con una clave nueva. Se espera `DECLINED`; no se genera deuda contable ni se trata el rechazo como fallo transitorio.
-
-### Liquidación, comprobante y autenticación
-
-Se consulta un pago autorizado después de la entrega asíncrona:
+Se consulta la proyección después del procesamiento asíncrono. El request GET no tiene body; mientras se procesa se puede recibir 404:
 
 ```bash
 curl -fsS "$settlement/api/settlements/$id" -H "X-Api-Key: $api_key"
 curl -fsS "$settlement/api/settlements/$id/ledger" -H "X-Api-Key: $api_key"
+curl -fsS "$settlement/api/settlements/$id/audit" -H "X-Api-Key: $api_key"
+```
+
+La proyección devuelve `pk`, `status`, `amount`, `currency` y `receiptKey`. El ledger devuelve dos entradas `PAYMENT_CLEARING` y `MERCHANT_PAYABLE`, con importes 25.50 y -25.50 y suma cero. La auditoría devuelve `eventId`, `payload`, `partition` y `offset`; se conserva el contenido original publicado en MSK.
+
+### Rechazo por política
+
+Se registra un importe superior al límite inicial 5000.00 mediante una clave nueva:
+
+```bash
+curl -fsS -X POST "$payment/api/payments" \
+  -H "X-Api-Key: $api_key" -H "Idempotency-Key: rejected-$key" \
+  -H 'Content-Type: application/json' -d @infrastructura/requests/payment-rejected.json
+```
+
+Se devuelve HTTP 200 con `status: REJECTED` y `reason: MERCHANT_LIMIT_EXCEEDED`. Se generan comprobante y auditoría; la consulta de ledger devuelve `[]`.
+
+### Pendientes y autenticación
+
+Se inspecciona el procesamiento sin modificar datos. Los requests GET no tienen body:
+
+```bash
 curl -fsS "$payment/internal/outbox" -H "X-Internal-Key: $internal_key"
+curl -fsS "$settlement/internal/settlement/backlog" -H "X-Internal-Key: $internal_key"
+curl -sS -i "$payment/internal/platform"
+curl -sS -i "$payment/api/payments/$id"
 ```
 
-La proyección contiene `pk`, `status`, `receiptKey`, `amount` y `currency`. El ledger contiene dos filas, `ACQUIRER_RECEIVABLE` con monto positivo y `MERCHANT_PAYABLE` con monto negativo, cuya suma es cero. Un 404 inicial de proyección indica que el worker todavía no completó la entrega.
+Se devuelven conteos de pendientes en las dos primeras operaciones y HTTP 401 en las consultas sin clave. El outbox devuelve destinos `SNS` y `KAFKA`, `total` y `pending`; el backlog devuelve `pendingReceipts` e `inbox`.
 
-Se valida que el acceso interno sin clave retorna HTTP 401:
+## Conjunto completo de pruebas
+
+Con infraestructura y aplicaciones levantadas se ejecuta todo desde la raíz:
 
 ```bash
-curl -i "$acquirer/internal/faults"
+bash scripts/test.sh all
 ```
 
-Se prueba API Gateway sin depender de resolución DNS externa:
+Se incluyen compilación, formato Java, pruebas de dominio, pruebas PostgreSQL con Testcontainers, pruebas AWS SDK contra Floci, sintaxis Python/shell, smoke REST, API Gateway y verificaciones de identidad IAM, TLS, aislamiento SQL y firmas KMS en S3. Se ejecutan sin tráfico concurrente ajeno al laboratorio y con la política inicial del dataset. La prueba SNS publica un evento técnico rechazado, sin asientos contables.
+
+Para EKS se utilizan las rutas del nodo:
 
 ```bash
-curl -fsS http://localhost:4566/api/payments/$id \
-  -H 'Host: axiz-payments.execute-api.localhost.floci.io' \
-  -H "X-Api-Key: $api_key"
+PAYMENT_URL=http://localhost:30080 SETTLEMENT_URL=http://localhost:30081 bash scripts/test.sh all
 ```
 
-Se devuelve el mismo pago registrado. El gateway se configura para la modalidad seleccionada; se reaplica el bootstrap al cambiar entre host, Compose y EKS.
-
-## Ejecución del conjunto de pruebas
-
-Se ejecutan compilación, formato, pruebas Java y validación sintáctica de los scripts con:
+Se puede ejecutar sólo compilación y pruebas sin infraestructura:
 
 ```bash
 bash scripts/test.sh
 ```
 
-Con infraestructura y servicios ya levantados se ejecuta el conjunto completo, incluidas pruebas transaccionales PostgreSQL mediante Testcontainers, escenarios REST y verificación AWS:
+La suite AWS SDK se activa con `RUN_FLOCI_IT=true` y la PostgreSQL con `RUN_POSTGRES_IT=true`; el modo `all` activa ambas. La verificación AWS se ejecuta en la imagen de herramientas y no requiere instalar AWS CLI. Se pueden repetir únicamente las comprobaciones de roles, Aurora y firmas:
 
 ```bash
-RUN_POSTGRES_IT=true bash scripts/test.sh all
+docker compose -f infrastructura/compose.yml run --rm --no-deps bootstrap python3 infrastructura/verify_aws.py
 ```
 
-Para probar los servicios en EKS desde Fedora con Docker Engine local:
+## Evidencia y límites de la emulación
+
+Se conserva en `validation/` la compilación con JDK 25/Maven, **27 pruebas aprobadas: 19 de dominio y 8 del SDK Java contra Floci**, las comprobaciones de formato y los protocolos AWS contra Floci 2.1.0. Se ejecutan pruebas del SDK Java real para identidad web, SSM, Secrets Manager, SNS, KMS, escritura condicional DynamoDB y separación de permisos. Se comprueban adicionalmente SNS/SQS, S3, KMS y API Gateway con un backend HTTP de prueba.
+
+**El entorno de generación no dispone de Docker. El despliegue completo Compose/EKS, la ejecución end-to-end de las aplicaciones con sus motores y las cuatro pruebas PostgreSQL quedan pendientes de ejecución en Fedora WSL.** Las pruebas de protocolo no prueban pods, conexiones físicas a Aurora ni el broker MSK.
+
+Se combinan entrega al menos una vez, outbox, inbox e identificadores estables. Una caída entre publicación y confirmación puede repetir un evento Kafka; la auditoría lo deduplica por `eventId`. SNS FIFO limita la deduplicación a su ventana temporal. S3 conserva versiones repetidas del mismo comprobante. No se promete una transacción distribuida ni entrega exactamente una vez entre sistemas.
+
+Floci no reproduce la red VPC ni la durabilidad/alta disponibilidad de AWS. Se utiliza Kafka PLAINTEXT y Redis sin autenticación dentro de la red local. PostgreSQL 18.6 se ejecuta como motor de Aurora emulado; esta selección no implica que AWS Aurora publique la misma versión. MSK utiliza el motor Redpanda administrado por Floci y no prueba la autenticación IAM de brokers AWS.
+
+Se conservan políticas con recursos concretos y tres concesiones locales necesarias en Floci 2.1.0: `monitoring:PutMetricData` por el prefijo de su protocolo CloudWatch, `sns:Publish` sobre los topics de la cuenta/región por su resolución JSON y `kms:Sign` sobre las claves de la cuenta/región porque el emulador evalúa `key/*`. Estas concesiones permiten probar los clientes reales, pero limitan la granularidad demostrable de SNS/KMS. Se retiran al adaptar las políticas a AWS; se conserva entonces únicamente el topic y la clave concreta. La denegación entre roles para DynamoDB/SSM y el sujeto OIDC se verifica mediante pruebas.
+
+## Operación
+
+Se muestran las rutas al final del arranque o mediante:
 
 ```bash
-node_ip=$(docker inspect floci-eks-axiz-payments --format '{{(index .NetworkSettings.Networks "axiz-network").IPAddress}}')
-PAYMENT_URL="http://$node_ip:30080" ACQUIRER_URL_TEST="http://$node_ip:30081" \
-SETTLEMENT_URL="http://$node_ip:30082" RUN_POSTGRES_IT=true bash scripts/test.sh all
+bash scripts/routes.sh
 ```
 
-El set REST comprueba autorización, replay, conflicto, recuperación después de dos fallos, timeout después de commit, conciliación, rechazo, apertura del circuito, balance contable y autenticación interna. Se restauran el simulador y el circuito al terminar.
+En EKS se utiliza:
 
-Las pruebas PostgreSQL comprueban atomicidad de decisión y outbox, deduplicación de ledger y rollback completo ante un crédito rechazado. `verify_aws.py` comprueba el sujeto IRSA, separación de permisos, SNS/SQS y las firmas de los comprobantes de precarga en S3. La verificación AWS utiliza el contenedor de herramientas y no requiere instalar AWS CLI en Fedora.
+```bash
+PAYMENT_URL=http://localhost:30080 SETTLEMENT_URL=http://localhost:30081 bash scripts/routes.sh
+```
 
-Los escenarios de fallos están concebidos para un laboratorio de una instancia por servicio y deben ejecutarse sin tráfico concurrente ajeno a la prueba.
-
-## Evidencia de validación y límites
-
-Se incluye evidencia de compilación con JDK 25 y Maven, 29 pruebas aprobadas de dominio y Resilience4j, y verificación del formato. Las cuatro pruebas opcionales PostgreSQL requieren Docker y constan como omitidas.
-
-Se valida adicionalmente el protocolo AWS contra el binario nativo de Floci 2.1.0: emisión OIDC, rechazo de sujeto incorrecto, denegación de permisos, SSM, Secrets Manager, CloudWatch, EventBridge, SNS/SQS, KMS y S3. Se comprueba el arranque REST del adquirente con Java 25 y Spring Boot 4.1.1, la idempotencia en DynamoDB y el proxy de API Gateway con parámetros de ruta y reenvío de cabeceras. Se conserva la salida verificable en `validation/`.
-
-**El entorno de generación no dispone de Docker ni capacidades para arrancar un daemon. El despliegue completo Compose/EKS y las pruebas transaccionales con los motores de contenedor quedan pendientes de validación en Fedora WSL.** La compilación no constituye evidencia de que esos despliegues se hayan ejecutado.
-
-No se garantiza entrega exactamente una vez entre sistemas independientes. Se combina entrega al menos una vez, identificadores estables e inbox. Kafka puede volver a recibir un evento si se publica y el proceso cae antes de confirmar el outbox; los consumidores deben deduplicar por `eventId`. S3 puede conservar varias versiones del mismo objeto. La pérdida definitiva de datos del adquirente no se resuelve inventando una decisión financiera.
-
-Floci no reproduce la red VPC, durabilidad distribuida de Aurora, autenticación IAM de MSK, alta disponibilidad ni escalado de EKS de AWS. Se usa Kafka PLAINTEXT y Redis sin autenticación dentro de la red local del laboratorio. Se incluye una excepción local de IAM para `monitoring:PutMetricData`, el prefijo utilizado por Floci 2.1.0, y `events:PutEvents` con recurso global porque el emulador no resuelve el bus durante esa evaluación. Estas concesiones locales se retiran al adaptar las políticas a AWS. Las claves de API se cargan al inicio; su rotación requiere reiniciar los servicios. Los endpoints internos de fallos y reset corresponden al laboratorio y requieren retirarse o restringirse al adaptar la solución a producción.
-
-## Operación y resolución de problemas
-
-Se consultan logs únicamente cuando se requiere diagnosticar un fallo:
+No se habilita access logging de sondas HTTP ni se imprime el health check de forma continua. Los logs operativos se consultan cuando se necesita diagnosticar un fallo:
 
 ```bash
 docker compose -f infrastructura/compose.yml logs bootstrap
 docker compose -f infrastructura/compose.yml logs payment settlement
-bash scripts/routes.sh
 ```
 
-Si falla TLS, se comprueba que `.runtime/rds-ca.crt` provenga del mismo volumen de Floci y que el hostname del datasource corresponda al endpoint anunciado. No se deshabilita `verify-full` para resolver el error.
+Ante un error TLS se comprueban CA, volumen de Floci y hostname del datasource; se mantiene `verify-full`. Si no resuelve Kafka en el host se reaplica `sudo bash scripts/host-dns.sh` y se comprueba que `/etc/hosts` no conserve una IP anterior. En EKS se reaplica el despliegue para actualizar `hostAliases`.
 
-Si Kafka no resuelve su hostname en ejecución host, se reaplica `sudo bash scripts/host-dns.sh` y se comprueba que el nombre apunte a la IP actual del contenedor. Se limpia una entrada antigua de `/etc/hosts` si cambió el broker. En EKS se reaplica el despliegue para actualizar `hostAliases`.
+Ante un rechazo STS se comprueban el renovador, audiencia, sujeto y rol. Si una proyección todavía no existe se inspeccionan outbox, backlog y consumidores antes de repetir el registro. Se mantienen las claves de idempotencia para recuperar operaciones existentes.
 
-Si STS rechaza el token, se comprueba el renovador, la audiencia y el ServiceAccount esperado. El cambio de cluster o de datos persistidos requiere regenerar tokens y trust policies mediante bootstrap. Se mantienen las claves locales de despliegue únicamente en Floci y el aprovisionador.
-
-Si la precarga devuelve `UNKNOWN`, se espera readiness del adquirente, se restaura el modo `SUCCESS` y se concilia el identificador existente. No se cambia la clave de idempotencia para ocultar la incidencia.
-
-Se interrumpen los servicios de primer plano con Ctrl+C. Después se detiene Compose:
+Se interrumpen procesos de primer plano con Ctrl+C y se detiene Compose:
 
 ```bash
 docker compose -f infrastructura/compose.yml --profile full --profile eks down
 ```
 
-Floci crea motores auxiliares fuera de la lista de servicios de Compose y conserva sus volúmenes. No se ejecuta una eliminación global de contenedores o volúmenes como parte de los scripts.
+Los motores auxiliares se crean desde Floci y pueden permanecer fuera del conjunto de servicios de Compose. No se elimina globalmente ningún contenedor ni volumen desde los scripts.
 
 ## Referencias técnicas
 
 - [Floci 2.1.0](https://github.com/floci-io/floci/tree/2.1.0).
-- [RDS y Aurora emulados](https://github.com/floci-io/floci/blob/2.1.0/docs/services/rds.md).
-- [EKS y emisión OIDC de Floci](https://github.com/floci-io/floci/blob/2.1.0/docs/services/eks.md).
+- [Aurora/RDS emulados](https://github.com/floci-io/floci/blob/2.1.0/docs/services/rds.md).
+- [EKS y emisión OIDC](https://github.com/floci-io/floci/blob/2.1.0/docs/services/eks.md).
 - [MSK emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/msk.md).
+- [Resolución de recursos IAM de Floci](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/iam/ResourceArnBuilder.java).
 - [Requisitos de Spring Boot](https://docs.spring.io/spring-boot/system-requirements.html).
-- [Resilience4j 2.4.0](https://github.com/resilience4j/resilience4j/releases/tag/v2.4.0).
-- [IAM database authentication en Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.html).
-- [IAM Roles for Service Accounts en EKS](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html).
+- [Autenticación IAM de Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.html).
+- [Roles por ServiceAccount en EKS](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html).

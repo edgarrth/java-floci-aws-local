@@ -1,6 +1,7 @@
 package pe.axiz.payment.domain;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 public record Payment(
@@ -11,25 +12,17 @@ public record Payment(
     String idempotencyKey,
     String fingerprint,
     Status status,
-    String authorizationCode,
+    String reason,
     Instant createdAt) {
   public enum Status {
-    PENDING,
-    AUTHORIZED,
-    DECLINED,
-    UNKNOWN
+    ACCEPTED,
+    REJECTED
   }
 
-  public boolean terminal() {
-    return status == Status.AUTHORIZED || status == Status.DECLINED;
-  }
-
-  public Payment complete(Status result, String code) {
-    if (terminal() && status != result)
-      throw new IllegalStateException("El pago ya tiene una decisión final");
-    if (result == Status.PENDING)
-      throw new IllegalArgumentException("La decisión no puede ser PENDING");
-    return new Payment(
-        id, merchantId, money, token, idempotencyKey, fingerprint, result, code, createdAt);
+  public Payment {
+    Objects.requireNonNull(id);
+    Objects.requireNonNull(money);
+    Objects.requireNonNull(status);
+    Objects.requireNonNull(createdAt);
   }
 }

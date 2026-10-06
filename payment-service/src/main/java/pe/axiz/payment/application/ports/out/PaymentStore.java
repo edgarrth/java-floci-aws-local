@@ -1,16 +1,13 @@
 package pe.axiz.payment.application.ports.out;
 
-import java.util.*;
+import java.util.Optional;
+import java.util.UUID;
 import pe.axiz.payment.domain.Payment;
 
 public interface PaymentStore {
-  record Reservation(Payment payment, boolean created) {}
-
-  Reservation reserve(Payment payment);
-
-  Payment complete(Payment payment);
+  Payment record(Payment payment);
 
   Optional<Payment> find(UUID id);
 
-  List<UUID> unresolved();
+  Optional<Payment> findByKey(String merchantId, String key);
 }

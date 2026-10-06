@@ -4,9 +4,8 @@ WORKDIR /workspace
 COPY pom.xml ./
 COPY platform platform
 COPY payment-service payment-service
-COPY acquirer-service acquirer-service
 COPY settlement-service settlement-service
-RUN ./mvnw -o -B -ntp package -DskipTests -pl ${SERVICE} -am && cp ${SERVICE}/target/${SERVICE}-1.0.0.jar /service.jar
+RUN ./mvnw -o -B -ntp package -DskipTests -pl ${SERVICE} -am && cp ${SERVICE}/target/${SERVICE}-2.0.0.jar /service.jar
 FROM eclipse-temurin:25.0.4.1_1-jre-noble
 WORKDIR /app
 RUN groupadd --gid 10001 axiz && useradd --uid 10001 --gid axiz --no-create-home axiz
