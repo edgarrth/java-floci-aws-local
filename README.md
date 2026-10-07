@@ -57,6 +57,8 @@ flowchart TD
 
 API Gateway y las APIs AWS se emulan dentro de Floci. Floci crea contenedores reales para PostgreSQL, Redis y Redpanda; en el modo EKS también crea k3s. No se declara otro PostgreSQL, Redis o Kafka en Compose porque se duplicaría la infraestructura administrada por el emulador. Secrets Manager y CloudWatch se consumen desde los dos servicios.
 
+Se resuelve el broker MSK mediante las etiquetas Docker de servicio, recurso, cuenta y región en `axiz-network`. Se cruza la dirección devuelta por `GetBootstrapBrokers` con la inspección del contenedor y se conserva su nombre DNS, que Redpanda anuncia a los clientes Kafka. Se admiten nombres basados en identificadores de volumen, como `floci-msk-dfda92`, sin depender del nombre del clúster. Se rechaza la selección cuando el broker no existe, está detenido o resulta ambiguo.
+
 ## Tecnologías y versiones
 
 | Tecnología | Versión | Uso |
@@ -391,9 +393,13 @@ Se conserva en `validation/` la compilación con JDK 25/Maven, **27 pruebas apro
 
 Para la corrección de la primera ejecución se repiten la instalación del wrapper con caché vacía y SHA-512, la preparación de dependencias, el empaquetado offline de cada servicio y `verify` con JDK 25. Se aprueban nuevamente 19 pruebas de dominio y Spotless; se omiten las ocho pruebas AWS y las cuatro PostgreSQL en esta ejecución. Se validan las configuraciones de los perfiles EKS, completo, host y construcción con Docker Compose 5.6.0, además de ShellCheck y sintaxis Python. Se conservan los registros adicionales y los resultados en `validation/first-run-fix.json`.
 
-La recuperación del aprovisionador y el contrato SDK de Redis se verifican con nueve pruebas aprobadas, incluidas dos del SDK boto3 real contra un servidor HTTP local que simula respuestas lentas o perdidas. Se comprueba la creación y reutilización de grupos ElastiCache. Se conservan los resultados en `validation/cache-replication-tests.log`.
+La suite del aprovisionador contiene 26 pruebas aprobadas. Se verifica la recuperación de respuestas lentas o perdidas con boto3 contra un servidor HTTP local, la creación y reutilización de grupos ElastiCache y la resolución del broker MSK. Se comprueban la recuperación de contenedores eliminados o detenidos, la reutilización del volumen original, la reconciliación de IP antigua y el rechazo de volúmenes ausentes, identidades incorrectas o selecciones ambiguas. Se conservan los resultados actuales en `validation/msk-recovery-tests.log`. Las operaciones Docker de estas pruebas se simulan; se conserva pendiente su ejecución con el daemon real.
+
+Se repite `mvn verify` con JDK 25 después de la corrección MSK: se aprueban la compilación, el empaquetado, Spotless y las 19 pruebas de dominio. Se omiten las 12 pruebas de integración que requieren infraestructura activa en esta ejecución. Se conserva `validation/msk-recovery-maven.log`.
 
 Se verifica adicionalmente con el binario oficial Floci 2.1.0 la creación, consulta y reutilización de un grupo Redis de un nodo, las APIs MSK de creación/consulta/brokers en modo mock y las cinco rutas de API Gateway. Se conserva `validation/floci-cache-contract.log`. Esta comprobación valida las APIs del emulador sin descargar ni arrancar motores Redis/MSK o pods Kubernetes.
+
+Se comprueba también el contrato de persistencia MSK con el binario oficial: se conserva el ARN y el identificador de volumen al parar y reiniciar Floci. Se interpreta su archivo real `msk-clusters.json` con la recuperación del aprovisionador, sin modificarlo. Se conserva `validation/msk-restart-contract.log`; el broker permanece en modo mock y sus operaciones Docker se simulan en esta comprobación.
 
 **El entorno de generación no dispone de Docker. El despliegue completo Compose/EKS, la ejecución end-to-end de las aplicaciones con sus motores y las cuatro pruebas PostgreSQL quedan pendientes de ejecución en Fedora WSL.** Las pruebas de protocolo no prueban pods, conexiones físicas a Aurora ni el broker MSK.
 
@@ -434,6 +440,10 @@ Durante la primera ejecución, Floci descarga y arranca los motores dentro de so
 
 Redis se aprovisiona con `CreateReplicationGroup` y se descubre con `DescribeReplicationGroups`. Se utiliza un nodo primario, sin réplicas ni failover, para comprobar la caché con un solo motor. En Floci 2.1.0, `CreateCacheCluster` se reserva para Memcached; una solicitud con `Engine=redis` devuelve `InvalidParameterValue`. Se conserva la reconciliación por lectura si el grupo ya existe o se pierde la respuesta.
 
+Floci 2.1.0 elimina el contenedor MSK durante su cierre y conserva los metadatos y el volumen, pero no restaura ese motor al reiniciar. El aprovisionador compensa esta limitación local: se inicia el contenedor detenido o se recrea exclusivamente el contenedor eliminado usando su volumen retenido y la imagen Redpanda configurada en Floci. Se verifica la identidad de cuenta, región, recurso y volumen, y se espera `/v1/status/ready`. Si el volumen no existe, se aborta la recuperación para evitar un Kafka vacío. Se conserva el ARN y se lee el estado del emulador desde el montaje de sólo lectura; no se elimina ni se vuelve a crear el recurso AWS.
+
+Tras recuperar el motor, el endpoint del plano de control puede conservar una IP anterior. Se utiliza el nombre DNS del contenedor verificado para las aplicaciones y los `hostAliases` EKS. Se repite `up --build` después de actualizar los archivos del proyecto, conservando `.env`, `.runtime/` y los volúmenes. La recuperación pertenece al laboratorio Floci; no se utiliza esta operación Docker contra AWS MSK. El contenedor recuperado puede permanecer activo después de detener Compose y sus logs se consultan directamente con `docker logs <nombre-del-broker>`; no se reconecta automáticamente su stream interno de logs a CloudWatch.
+
 Si una ejecución anterior termina con `DBClusterAlreadyExistsFault` o un conflicto de nombre de k3s, se actualizan los archivos del proyecto y se repite el comando EKS con `--build`. Se reconstruye la imagen de herramientas con el aprovisionador corregido y se reutilizan los recursos existentes. Se conserva el cluster EKS si ya se encuentra en `ACTIVE`; un estado `FAILED` requiere revisar los logs del motor antes de continuar.
 
 Se interrumpen procesos de primer plano con Ctrl+C y se detiene Compose:
@@ -450,6 +460,8 @@ Los motores auxiliares se crean desde Floci y pueden permanecer fuera del conjun
 - [Aurora/RDS emulados](https://github.com/floci-io/floci/blob/2.1.0/docs/services/rds.md).
 - [EKS y emisión OIDC](https://github.com/floci-io/floci/blob/2.1.0/docs/services/eks.md).
 - [MSK emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/msk.md).
+- [Ciclo de vida y persistencia MSK en Floci 2.1.0](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/msk/MskService.java).
+- [Arranque y almacenamiento Redpanda en Floci 2.1.0](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/msk/RedpandaManager.java).
 - [ElastiCache emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/elasticache.md).
 - [Grupos de replicación Redis/Valkey](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_CreateReplicationGroup.html).
 - [Resolución de recursos IAM de Floci](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/iam/ResourceArnBuilder.java).

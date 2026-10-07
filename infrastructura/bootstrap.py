@@ -4,6 +4,7 @@
 import json
 import os
 import pathlib
+import re
 import secrets
 import shutil
 import subprocess
@@ -29,6 +30,7 @@ REGION = os.environ.get("AWS_REGION", "us-east-1")
 ENDPOINT = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
 ACCOUNT = "000000000000"
 CLUSTER = "axiz-payments"
+FLOCI_DATA = pathlib.Path("/floci-data")
 
 
 def positive_seconds(name, default):
@@ -652,6 +654,203 @@ def managed_cache():
     )
 
 
+def msk_filters(cluster_arn):
+    arn_parts = cluster_arn.split(":", 5)
+    cluster_name = arn_parts[5].split("/")[1]
+    return {
+        "label=io.floci": "aws",
+        "label=io.floci.service": "msk",
+        "label=io.floci.resource-id": cluster_name,
+        "label=io.floci.account": arn_parts[4],
+        "label=io.floci.region": arn_parts[3],
+        "network": "axiz-network",
+    }
+
+
+def restore_msk_runtime(cluster_arn, api_brokers=None):
+    """Se recupera el motor retenido cuando Floci 2.1.0 conserva sólo sus metadatos."""
+    filters = msk_filters(cluster_arn)
+    command = ["docker", "ps", "--all", "--format", "{{.ID}}"]
+    for key, value in filters.items():
+        command.extend(["--filter", key + "=" + value])
+    identifiers = subprocess.run(
+        command, check=True, capture_output=True, text=True
+    ).stdout.splitlines()
+    if len(identifiers) > 1:
+        raise RuntimeError("La recuperación MSK requiere un único contenedor para " + cluster_arn)
+    if identifiers:
+        container = json.loads(
+            subprocess.run(
+                ["docker", "inspect", identifiers[0]], check=True, capture_output=True, text=True
+            ).stdout
+        )[0]
+        if container["State"]["Running"]:
+            labels = container["Config"].get("Labels") or {}
+            name = container["Name"].removeprefix("/")
+            if labels.get("pe.axiz.msk-recovered") == "true":
+                wait_msk_ready(name)
+                return name
+            network = (
+                container.get("NetworkSettings", {}).get("Networks", {}).get("axiz-network", {})
+            )
+            if api_brokers is None or api_brokers.rpartition(":")[0] in {
+                name,
+                network.get("IPAddress"),
+            }:
+                return None
+    else:
+        container = None
+
+    # Se lee el volumen del emulador en modo sólo lectura; no se edita su estado.
+    source = FLOCI_DATA / "msk-clusters.json"
+    if not source.exists():
+        raise RuntimeError(
+            "Se requieren los metadatos persistidos de MSK para recuperar su volumen"
+        )
+    records = json.loads(source.read_text())
+    matching = [r for r in records.values() if r.get("clusterArn") == cluster_arn]
+    if len(matching) != 1:
+        raise RuntimeError("No se encontró un único registro persistido para " + cluster_arn)
+    record = matching[0]
+    volume_id = record.get("volumeId")
+    if (
+        record.get("clusterName") != filters["label=io.floci.resource-id"]
+        or record.get("accountId") != filters["label=io.floci.account"]
+        or record.get("resourceRegion") != filters["label=io.floci.region"]
+        or not isinstance(volume_id, str)
+        or not re.fullmatch(r"[0-9a-f]{6}", volume_id)
+    ):
+        raise RuntimeError(
+            "Los metadatos MSK no permiten verificar la identidad del volumen retenido"
+        )
+    name = "floci-msk-" + volume_id
+    # Se impide que Docker cree un volumen vacío si se perdió el original.
+    subprocess.run(
+        ["docker", "volume", "inspect", name], check=True, capture_output=True, text=True
+    )
+    if container:
+        mounts = container.get("Mounts", [])
+        if container["Name"] != "/" + name or not any(
+            m.get("Type") == "volume"
+            and m.get("Name") == name
+            and m.get("Destination") == "/var/lib/redpanda/data"
+            for m in mounts
+        ):
+            raise RuntimeError("El contenedor MSK detenido no utiliza el volumen original")
+    else:
+        emulator = json.loads(
+            subprocess.run(
+                ["docker", "inspect", "axiz-floci"], check=True, capture_output=True, text=True
+            ).stdout
+        )[0]
+        if emulator["Config"]["Image"] != "floci/floci:2.1.0":
+            raise RuntimeError("La recuperación del motor MSK está validada para Floci 2.1.0")
+        env = dict(value.split("=", 1) for value in emulator["Config"]["Env"] if "=" in value)
+        image = env.get("FLOCI_SERVICES_MSK_DEFAULT_IMAGE")
+        if not image:
+            raise RuntimeError("Floci no declara la imagen Redpanda necesaria para recuperar MSK")
+        command = [
+            "docker",
+            "create",
+            "--name",
+            name,
+            "--network",
+            "axiz-network",
+            "--mount",
+            "type=volume,src=" + name + ",dst=/var/lib/redpanda/data,volume-nocopy",
+            "--log-opt",
+            "max-size=10m",
+            "--log-opt",
+            "max-file=3",
+            "--label",
+            "floci=true",
+            "--label",
+            "floci_emulator=floci-aws",
+            "--label",
+            "pe.axiz.msk-recovered=true",
+        ]
+        for key, value in filters.items():
+            if key.startswith("label="):
+                command.extend(["--label", key.removeprefix("label=") + "=" + value])
+        command.extend(
+            [
+                image,
+                "redpanda",
+                "start",
+                "--overprovisioned",
+                "--smp",
+                "1",
+                "--memory",
+                "512M",
+                "--reserve-memory",
+                "0M",
+                "--advertise-kafka-addr",
+                name + ":9092",
+            ]
+        )
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    print("Se recupera el broker MSK con su volumen retenido: " + name, flush=True)
+    if not container or not container["State"]["Running"]:
+        subprocess.run(["docker", "start", name], check=True, capture_output=True, text=True)
+    wait_msk_ready(name)
+    return name
+
+
+def wait_msk_ready(name):
+    def check():
+        with urllib.request.urlopen(
+            "http://" + name + ":9644/v1/status/ready", timeout=3
+        ) as response:
+            return response.status == 200
+
+    wait(check, "disponibilidad del motor MSK " + name)
+
+
+def msk_brokers(cluster_arn, api_brokers, recovered_name=None):
+    """Se resuelve el nombre anunciado por Redpanda sin inferir nombres de contenedor."""
+    filters = msk_filters(cluster_arn)
+    command = ["docker", "ps", "--format", "{{.ID}}"]
+    for key, value in filters.items():
+        command.extend(["--filter", key + "=" + value])
+    identifiers = subprocess.run(
+        command, check=True, capture_output=True, text=True
+    ).stdout.splitlines()
+    if not identifiers:
+        raise RuntimeError(
+            "No se encontró un broker MSK en ejecución para "
+            + cluster_arn
+            + " en la red axiz-network"
+        )
+    # La API devuelve la IP interna; Kafka anuncia el nombre DNS del mismo contenedor.
+    containers = json.loads(
+        subprocess.run(
+            ["docker", "inspect", *identifiers], check=True, capture_output=True, text=True
+        ).stdout
+    )
+    host, separator, port = api_brokers.rpartition(":")
+    if not separator or port != "9092" or "," in host:
+        raise RuntimeError(
+            "MSK devolvió un endpoint incompatible con el broker local: " + api_brokers
+        )
+    matches = []
+    for container in containers:
+        network = container["NetworkSettings"]["Networks"].get("axiz-network", {})
+        name = container["Name"].removeprefix("/")
+        # Floci conserva la IP anterior cuando se recupera su motor fuera del emulador.
+        if container["State"]["Running"] and (
+            host in {name, network.get("IPAddress")} or name == recovered_name
+        ):
+            matches.append(name + ":" + port)
+    if len(matches) != 1:
+        raise RuntimeError(
+            "No se pudo identificar un único contenedor MSK para "
+            + cluster_arn
+            + " con endpoint "
+            + api_brokers
+        )
+    return matches[0]
+
+
 def managed_engines():
     managed_cache()
     kafka = client("kafka")
@@ -686,17 +885,13 @@ def managed_engines():
         "MSK",
         retryable_codes={"NotFoundException"},
     )
-    brokers = kafka.get_bootstrap_brokers(ClusterArn=cluster_arn)["BootstrapBrokerString"]
-    names = subprocess.run(
-        ["docker", "ps", "--filter", "name=floci-msk-", "--format", "{{.Names}}"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    broker_name = next((name for name in names if name.endswith("axiz-events")), None)
-    if not broker_name:
-        raise RuntimeError("No se encontró el contenedor real de MSK")
-    brokers = broker_name + ":9092"
+    api_brokers = kafka.get_bootstrap_brokers(ClusterArn=cluster_arn)["BootstrapBrokerString"]
+    recovered_name = restore_msk_runtime(cluster_arn, api_brokers)
+    brokers = msk_brokers(
+        cluster_arn,
+        api_brokers,
+        recovered_name,
+    )
     (RUNTIME / "kafka-bootstrap").write_text(brokers)
     return brokers
 

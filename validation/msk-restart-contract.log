@@ -1,0 +1,5 @@
+Floci 2.1.0: formato persistido MSK, ARN, cuenta, región y volumeId comprobados.
+Floci 2.1.0: ARN y volumeId conservados tras parar y reiniciar el proceso.
+Se recupera el broker MSK con su volumen retenido: floci-msk-d417f2
+Aprovisionador: se interpreta el registro real de Floci y se conserva intacto.
+Límite: las operaciones Docker y la disponibilidad del motor se simularon; MSK se ejecutó en modo mock.

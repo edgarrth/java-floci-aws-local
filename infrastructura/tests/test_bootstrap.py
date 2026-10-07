@@ -1,11 +1,15 @@
 """Se comprueba que una creación lenta o con respuesta perdida no se duplica."""
 
 import contextlib
+import json
+import subprocess
+import tempfile
 import threading
 import time
 import unittest
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import boto3
@@ -231,6 +235,151 @@ class ManagedCacheTest(unittest.TestCase):
 
     def test_reuses_an_existing_replication_group(self):
         self.exercise_cache(True)
+
+
+class ManagedBrokerTest(unittest.TestCase):
+    cluster_arn = "arn:aws:kafka:us-east-1:000000000000:cluster/axiz-events/identificador"
+
+    def container(self, name="floci-msk-dfda92", address="172.20.0.8", running=True):
+        return {
+            "Name": "/" + name,
+            "State": {"Running": running},
+            "NetworkSettings": {"Networks": {"axiz-network": {"IPAddress": address}}},
+        }
+
+    def command_results(self, containers):
+        return [
+            subprocess.CompletedProcess([], 0, stdout="broker-id\n"),
+            subprocess.CompletedProcess([], 0, stdout=json.dumps(containers)),
+        ]
+
+    def test_resolves_random_and_legacy_names_scoped_to_resource_identity(self):
+        for name in ("floci-msk-dfda92", "floci-msk-axiz-events"):
+            with (
+                self.subTest(name=name),
+                patch.object(
+                    bootstrap.subprocess,
+                    "run",
+                    side_effect=self.command_results([self.container(name)]),
+                ) as run,
+            ):
+                self.assertEqual(
+                    bootstrap.msk_brokers(self.cluster_arn, "172.20.0.8:9092"), name + ":9092"
+                )
+                command = run.call_args_list[0].args[0]
+                for expected in (
+                    "label=io.floci=aws",
+                    "label=io.floci.service=msk",
+                    "label=io.floci.resource-id=axiz-events",
+                    "label=io.floci.account=000000000000",
+                    "label=io.floci.region=us-east-1",
+                    "network=axiz-network",
+                ):
+                    self.assertIn(expected, command)
+
+    def test_uses_the_api_endpoint_to_disambiguate_surviving_containers(self):
+        containers = [self.container("floci-msk-old", "172.20.0.7"), self.container()]
+        with patch.object(
+            bootstrap.subprocess, "run", side_effect=self.command_results(containers)
+        ):
+            self.assertEqual(
+                bootstrap.msk_brokers(self.cluster_arn, "172.20.0.8:9092"),
+                "floci-msk-dfda92:9092",
+            )
+
+    def test_accepts_the_container_dns_name_returned_by_the_api(self):
+        with patch.object(
+            bootstrap.subprocess, "run", side_effect=self.command_results([self.container()])
+        ):
+            self.assertEqual(
+                bootstrap.msk_brokers(self.cluster_arn, "floci-msk-dfda92:9092"),
+                "floci-msk-dfda92:9092",
+            )
+
+    def test_rejects_missing_mismatched_stopped_and_ambiguous_brokers(self):
+        with (
+            patch.object(
+                bootstrap.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, stdout=""),
+            ) as run,
+            self.assertRaisesRegex(RuntimeError, "en ejecución"),
+        ):
+            bootstrap.msk_brokers(self.cluster_arn, "172.20.0.8:9092")
+        self.assertEqual(run.call_count, 1)
+        for containers in (
+            [self.container(address="172.20.0.9")],
+            [self.container(running=False)],
+            [self.container(), self.container("floci-msk-duplicate")],
+        ):
+            with (
+                self.subTest(containers=containers),
+                patch.object(
+                    bootstrap.subprocess, "run", side_effect=self.command_results(containers)
+                ),
+                self.assertRaisesRegex(RuntimeError, "único contenedor"),
+            ):
+                bootstrap.msk_brokers(self.cluster_arn, "172.20.0.8:9092")
+
+    def test_does_not_substitute_a_mock_endpoint_or_hide_docker_failures(self):
+        with (
+            patch.object(
+                bootstrap.subprocess, "run", side_effect=self.command_results([self.container()])
+            ),
+            self.assertRaisesRegex(RuntimeError, "único contenedor"),
+        ):
+            bootstrap.msk_brokers(self.cluster_arn, "localhost:9092")
+        with (
+            patch.object(
+                bootstrap.subprocess,
+                "run",
+                side_effect=subprocess.CalledProcessError(1, ["docker"]),
+            ),
+            self.assertRaises(subprocess.CalledProcessError),
+        ):
+            bootstrap.msk_brokers(self.cluster_arn, "172.20.0.8:9092")
+
+    def test_reuses_the_sdk_cluster_and_persists_the_announced_dns_name(self):
+        with (
+            contextlib.closing(
+                boto3.client(
+                    "kafka",
+                    region_name="us-east-1",
+                    endpoint_url="http://localhost:4566",
+                    aws_access_key_id="floci",
+                    aws_secret_access_key="floci",
+                    config=bootstrap.CONFIG,
+                )
+            ) as kafka,
+            Stubber(kafka) as stubber,
+            tempfile.TemporaryDirectory() as directory,
+        ):
+            cluster = {
+                "ClusterArn": self.cluster_arn,
+                "ClusterName": "axiz-events",
+                "State": "ACTIVE",
+            }
+            params = {"ClusterArn": self.cluster_arn}
+            stubber.add_response("list_clusters", {"ClusterInfoList": [cluster]}, {})
+            stubber.add_response("describe_cluster", {"ClusterInfo": cluster}, params)
+            stubber.add_response(
+                "get_bootstrap_brokers", {"BootstrapBrokerString": "172.20.0.8:9092"}, params
+            )
+            with (
+                patch.object(bootstrap, "client", return_value=kafka),
+                patch.object(bootstrap, "managed_cache"),
+                patch.object(bootstrap, "restore_msk_runtime", return_value=None),
+                patch.object(bootstrap, "RUNTIME", Path(directory)),
+                patch.object(
+                    bootstrap.subprocess,
+                    "run",
+                    side_effect=self.command_results([self.container()]),
+                ),
+            ):
+                result = bootstrap.managed_engines()
+            self.assertEqual(result, "floci-msk-dfda92:9092")
+            self.assertEqual((Path(directory) / "kafka-bootstrap").read_text(), result)
+            stubber.assert_no_pending_responses()
 
 
 if __name__ == "__main__":
