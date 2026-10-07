@@ -1,0 +1,91 @@
+[INFO] Scanning for projects...
+[INFO] Loaded 24013 auto-discovered prefixes for remote repository central (prefixes-central.txt)
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Axiz Floci Payments                                                [pom]
+[INFO] platform                                                           [jar]
+[INFO] payment-service                                                    [jar]
+[INFO] 
+[INFO] -----------------------< pe.axiz:floci-payments >-----------------------
+[INFO] Building Axiz Floci Payments 2.0.0                                 [1/3]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- enforcer:3.6.3:enforce (default) @ floci-payments ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] Rule 1: org.apache.maven.enforcer.rules.version.RequireMavenVersion passed
+[INFO] 
+[INFO] --------------------------< pe.axiz:platform >--------------------------
+[INFO] Building platform 2.0.0                                            [2/3]
+[INFO]   from platform/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] Loaded 74 auto-discovered prefixes for remote repository apache.snapshots (prefixes-apache.snapshots.txt)
+[INFO] 
+[INFO] --- enforcer:3.6.3:enforce (default) @ platform ---
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ platform ---
+[INFO] skip non existing resourceDirectory /workspace/scratch/e9eb687a9e66/axiz-floci-payments/platform/src/main/resources
+[INFO] skip non existing resourceDirectory /workspace/scratch/e9eb687a9e66/axiz-floci-payments/platform/src/main/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ platform ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 11 source files with javac [debug parameters release 25] to target/classes
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ platform ---
+[INFO] skip non existing resourceDirectory /workspace/scratch/e9eb687a9e66/axiz-floci-payments/platform/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ platform ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ platform ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.5.1:jar (default-jar) @ platform ---
+[INFO] Building jar: /workspace/scratch/e9eb687a9e66/axiz-floci-payments/platform/target/platform-2.0.0.jar
+[INFO] 
+[INFO] ----------------------< pe.axiz:payment-service >-----------------------
+[INFO] Building payment-service 2.0.0                                     [3/3]
+[INFO]   from payment-service/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] Loaded 24013 auto-discovered prefixes for remote repository maven-central (prefixes-maven-central.txt)
+[INFO] 
+[INFO] --- enforcer:3.6.3:enforce (default) @ payment-service ---
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ payment-service ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ payment-service ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 13 source files with javac [debug parameters release 25] to target/classes
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ payment-service ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ payment-service ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 2 source files with javac [debug parameters release 25] to target/test-classes
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ payment-service ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- jar:3.5.1:jar (default-jar) @ payment-service ---
+[INFO] Building jar: /workspace/scratch/e9eb687a9e66/axiz-floci-payments/payment-service/target/payment-service-2.0.0.jar
+[INFO] 
+[INFO] --- spring-boot:4.1.1:repackage (repackage) @ payment-service ---
+[INFO] Loaded 50 auto-discovered prefixes for remote repository ow2-snapshot (prefixes-ow2-snapshot.txt)
+[INFO] Replacing main artifact /workspace/scratch/e9eb687a9e66/axiz-floci-payments/payment-service/target/payment-service-2.0.0.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to /workspace/scratch/e9eb687a9e66/axiz-floci-payments/payment-service/target/payment-service-2.0.0.jar.original
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Axiz Floci Payments 2.0.0:
+[INFO] 
+[INFO] Axiz Floci Payments ................................ SUCCESS [  0.205 s]
+[INFO] platform ........................................... SUCCESS [  1.529 s]
+[INFO] payment-service .................................... SUCCESS [  1.119 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  3.225 s
+[INFO] Finished at: 2026-10-07T16:50:45+13:00
+[INFO] ------------------------------------------------------------------------

@@ -5,3 +5,39 @@ services:
   bootstrap:
     environment:
       BOOTSTRAP_TARGET: eks
+  payment-image:
+    image: axiz-payment-service:2.0.0
+    pull_policy: never
+    profiles: [eks]
+    build:
+      context: ..
+      dockerfile: infrastructura/Dockerfile.application
+      additional_contexts:
+        java-base: service:java-base
+      args:
+        SERVICE: payment-service
+    entrypoint: ["/usr/bin/true"]
+    command: []
+    network_mode: none
+    restart: "no"
+  settlement-image:
+    image: axiz-settlement-service:2.0.0
+    pull_policy: never
+    profiles: [eks]
+    build:
+      context: ..
+      dockerfile: infrastructura/Dockerfile.application
+      additional_contexts:
+        java-base: service:java-base
+      args:
+        SERVICE: settlement-service
+    entrypoint: ["/usr/bin/true"]
+    command: []
+    network_mode: none
+    restart: "no"
+  eks-deploy:
+    depends_on:
+      payment-image:
+        condition: service_completed_successfully
+      settlement-image:
+        condition: service_completed_successfully

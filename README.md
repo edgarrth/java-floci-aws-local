@@ -109,7 +109,7 @@ Se utiliza el paquete raíz `pe.axiz`. Se conserva la organización hexagonal de
 
 ## Preparación en Fedora WSL
 
-Se requiere JDK 25, Python 3, curl, Docker Engine con Compose v2 y conectividad para descargar dependencias e imágenes. En WSL se habilita systemd y se utiliza un daemon Docker accesible desde la distribución. Se recomienda asignar 8 GB de memoria al laboratorio y más capacidad al modo EKS.
+Se requiere JDK 25, Python 3, curl, Docker Engine con Compose 2.20 o superior y conectividad para descargar dependencias e imágenes. En WSL se habilita systemd y se utiliza un daemon Docker accesible desde la distribución. Se recomienda asignar 8 GB de memoria al laboratorio y más capacidad al modo EKS.
 
 ```bash
 sudo dnf install java-25-openjdk-devel python3 curl
@@ -124,13 +124,13 @@ Se instala Docker según la [guía oficial para Fedora](https://docs.docker.com/
 
 ## Imágenes base reutilizables
 
-Se construye primero una imagen Java que contiene Maven y las dependencias del reactor. Sólo se copian los POM en esa etapa, por lo que los cambios de código no invalidan la descarga de dependencias. Se construyen después las imágenes de herramientas y de los dos servicios:
+Compose construye primero una imagen Java que contiene las herramientas de descarga, Maven y las dependencias del reactor. Sólo se copian el wrapper y los POM en esa etapa, por lo que los cambios de código no invalidan la descarga de dependencias. Se construyen después las imágenes de herramientas y de los dos servicios. Se puede preparar este conjunto por separado:
 
 ```bash
 bash scripts/build-base.sh
 ```
 
-La imagen de herramientas contiene boto3, psycopg, Docker CLI y las migraciones. Las imágenes de aplicación compilan offline sobre la base y ejecutan JRE con usuario no root. `--no-build` permite reutilizarlas.
+La imagen de herramientas contiene boto3, psycopg, Docker CLI y las migraciones. Las imágenes de aplicación compilan offline sobre la base y ejecutan JRE con usuario no root. El paso separado es opcional cuando se utiliza `up --build`. Las imágenes `axiz-*` se construyen localmente; su política `pull_policy: never` evita búsquedas en Docker Hub. `--no-build` permite reutilizarlas después de una construcción completa.
 
 Se importa el `pom.xml` raíz en el IDE y se selecciona JDK 25. La compilación local se realiza con:
 
@@ -140,7 +140,7 @@ Se importa el `pom.xml` raíz en el IDE y se selecciona JDK 25. La compilación 
 
 ## Ejecución en EKS administrado por Floci
 
-Se utiliza este modo para comprobar las conexiones a Aurora desde pods y ServiceAccounts. Después de construir las imágenes se inicia la infraestructura y el despliegue en primer plano:
+Se utiliza este modo para comprobar las conexiones a Aurora desde pods y ServiceAccounts. En la primera ejecución, después de la preparación del entorno, se construyen las imágenes y se inicia la infraestructura y el despliegue en primer plano con un solo comando:
 
 ```bash
 docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --build
@@ -152,7 +152,7 @@ Se pueden reutilizar las imágenes existentes:
 docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --no-build
 ```
 
-El bootstrap crea recursos AWS, CA, roles, esquemas y migraciones. `eks.py` importa las imágenes locales a containerd, aplica ServiceAccounts, Deployments y Services, espera readiness, precarga pagos y muestra las rutas. Se conserva el manifiesto aplicado en `.runtime/deployment.local.yml`. Se incluyen huellas de imagen y configuración en el pod para provocar un rollout al actualizar el código o la CA. Cuando cambia Java se reconstruyen las imágenes con `bash scripts/build-base.sh` antes del despliegue.
+El bootstrap crea recursos AWS, CA, roles, esquemas y migraciones. Las tareas `payment-image` y `settlement-image` construyen las imágenes de aplicación y terminan sin iniciar JVM ni publicar puertos; el despliegue espera su finalización y la del bootstrap. `eks.py` importa las imágenes locales a containerd, aplica ServiceAccounts, Deployments y Services, espera readiness, precarga pagos y muestra las rutas. Se conserva el manifiesto aplicado en `.runtime/deployment.local.yml`. Se incluyen huellas de imagen y configuración en el pod para provocar un rollout al actualizar el código o la CA. Se utiliza nuevamente `up --build` para aplicar cambios de código o de la imagen base.
 
 Se utilizan `axiz-payment` y `axiz-settlement` en el namespace `axiz`. Cada trust policy exige `system:serviceaccount:axiz:<service-account>` y audiencia `sts.amazonaws.com`. Se limita `rds-db:connect` al recurso del cluster y al usuario de cada contexto. Las aplicaciones no reciben claves AWS permanentes ni la contraseña de administración SQL.
 
@@ -383,6 +383,8 @@ docker compose -f infrastructura/compose.yml run --rm --no-deps bootstrap python
 
 Se conserva en `validation/` la compilación con JDK 25/Maven, **27 pruebas aprobadas: 19 de dominio y 8 del SDK Java contra Floci**, las comprobaciones de formato y los protocolos AWS contra Floci 2.1.0. Se ejecutan pruebas del SDK Java real para identidad web, SSM, Secrets Manager, SNS, KMS, escritura condicional DynamoDB y separación de permisos. Se comprueban adicionalmente SNS/SQS, S3, KMS y API Gateway con un backend HTTP de prueba.
 
+Para la corrección de la primera ejecución se repiten la instalación del wrapper con caché vacía y SHA-512, la preparación de dependencias, el empaquetado offline de cada servicio y `verify` con JDK 25. Se aprueban nuevamente 19 pruebas de dominio y Spotless; se omiten las ocho pruebas AWS y las cuatro PostgreSQL en esta ejecución. Se validan las configuraciones de los perfiles EKS, completo, host y construcción con Docker Compose 5.6.0, además de ShellCheck y sintaxis Python. Se conservan los registros adicionales y los resultados en `validation/first-run-fix.json`.
+
 **El entorno de generación no dispone de Docker. El despliegue completo Compose/EKS, la ejecución end-to-end de las aplicaciones con sus motores y las cuatro pruebas PostgreSQL quedan pendientes de ejecución en Fedora WSL.** Las pruebas de protocolo no prueban pods, conexiones físicas a Aurora ni el broker MSK.
 
 Se combinan entrega al menos una vez, outbox, inbox e identificadores estables. Una caída entre publicación y confirmación puede repetir un evento Kafka; la auditoría lo deduplica por `eventId`. SNS FIFO limita la deduplicación a su ventana temporal. S3 conserva versiones repetidas del mismo comprobante. No se promete una transacción distribuida ni entrega exactamente una vez entre sistemas.
@@ -416,6 +418,8 @@ Ante un error TLS se comprueban CA, volumen de Floci y hostname del datasource; 
 
 Ante un rechazo STS se comprueban el renovador, audiencia, sujeto y rol. Si una proyección todavía no existe se inspeccionan outbox, backlog y consumidores antes de repetir el registro. Se mantienen las claves de idempotencia para recuperar operaciones existentes.
 
+Si una versión anterior termina con código 127 al ejecutar `mvnw` en `Dockerfile.base`, se actualizan el Dockerfile y el wrapper y se repite `up --build`: se instalan las herramientas de descarga antes de preparar Maven. Un mensaje `pull access denied` para `axiz-tools` indica que se está utilizando la configuración anterior; se actualizan los archivos Compose con la política de imágenes locales. Se conservan `.env`, `.runtime/` y los volúmenes al reemplazar los archivos del proyecto.
+
 Se interrumpen procesos de primer plano con Ctrl+C y se detiene Compose:
 
 ```bash
@@ -432,5 +436,7 @@ Los motores auxiliares se crean desde Floci y pueden permanecer fuera del conjun
 - [MSK emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/msk.md).
 - [Resolución de recursos IAM de Floci](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/iam/ResourceArnBuilder.java).
 - [Requisitos de Spring Boot](https://docs.spring.io/spring-boot/system-requirements.html).
+- [Construcción de imágenes y dependencias en Compose](https://docs.docker.com/reference/compose-file/build/).
+- [Política de descarga de imágenes locales en Compose](https://docs.docker.com/reference/compose-file/services/#pull_policy).
 - [Autenticación IAM de Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.html).
 - [Roles por ServiceAccount en EKS](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html).

@@ -26,12 +26,14 @@ x-common: &common
 services:
   java-base:
     image: axiz-java-base:2.0.0
+    pull_policy: never
     build:
       context: ..
       dockerfile: infrastructura/Dockerfile.base
     command: ["true"]
   tools:
     image: axiz-tools:2.0.0
+    pull_policy: never
     profiles: [build]
     build:
       context: ..
@@ -73,6 +75,7 @@ services:
       - floci-data-v2:/app/data
   bootstrap:
     image: axiz-tools:2.0.0
+    pull_policy: never
     build:
       context: ..
       dockerfile: infrastructura/Dockerfile.tools
@@ -96,6 +99,7 @@ services:
     command: ["python3", "infrastructura/bootstrap.py", "provision"]
   token-renewer:
     image: axiz-tools:2.0.0
+    pull_policy: never
     depends_on:
       bootstrap:
         condition: service_completed_successfully
@@ -108,6 +112,7 @@ services:
   payment:
     <<: *common
     image: axiz-payment-service:2.0.0
+    pull_policy: never
     profiles: [full,build]
     build:
       <<: *application-build
@@ -121,6 +126,7 @@ services:
   settlement:
     <<: *common
     image: axiz-settlement-service:2.0.0
+    pull_policy: never
     profiles: [full,build]
     build:
       <<: *application-build
@@ -133,6 +139,7 @@ services:
       DB_USER: axiz_settlement
   seed:
     image: axiz-tools:2.0.0
+    pull_policy: never
     profiles: [full]
     depends_on:
       payment:
@@ -144,6 +151,7 @@ services:
     command: ["python3", "datasets/seed.py", "http://payment:8080"]
   routes:
     image: axiz-tools:2.0.0
+    pull_policy: never
     profiles: [full]
     depends_on:
       seed:
@@ -153,6 +161,7 @@ services:
   eks-deploy:
     env_file: ../.env
     image: axiz-tools:2.0.0
+    pull_policy: never
     profiles: [eks]
     environment:
       AWS_ENDPOINT_URL: http://floci:4566

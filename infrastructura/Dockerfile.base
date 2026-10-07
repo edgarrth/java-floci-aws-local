@@ -1,4 +1,7 @@
 FROM eclipse-temurin:25.0.4.1_1-jdk-noble
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash ca-certificates curl coreutils gzip tar \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace
 COPY mvnw pom.xml ./
 COPY platform/pom.xml platform/pom.xml
