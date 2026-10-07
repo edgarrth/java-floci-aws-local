@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError, ReadTimeoutError
+from botocore.stub import Stubber
 
 from infrastructura import bootstrap
 
@@ -167,6 +168,69 @@ class ControlPlaneWireTest(unittest.TestCase):
 
     def test_lost_response_is_reconciled_with_real_sdk_without_duplicate_request(self):
         self.exercise_creation(0.05)
+
+
+class ManagedCacheTest(unittest.TestCase):
+    def exercise_cache(self, existing):
+        group = {
+            "ReplicationGroupId": "axiz-policies",
+            "Status": "available",
+            "NodeGroups": [
+                {"NodeGroupId": "0001", "PrimaryEndpoint": {"Address": "floci", "Port": 6379}}
+            ],
+        }
+        describe_params = {"ReplicationGroupId": "axiz-policies"}
+        with contextlib.closing(
+            boto3.client(
+                "elasticache",
+                region_name="us-east-1",
+                endpoint_url="http://localhost:4566",
+                aws_access_key_id="floci",
+                aws_secret_access_key="floci",
+                config=bootstrap.CONFIG,
+            )
+        ) as cache:
+            with Stubber(cache) as stubber:
+                if existing:
+                    stubber.add_response(
+                        "describe_replication_groups",
+                        {"ReplicationGroups": [group]},
+                        describe_params,
+                    )
+                else:
+                    stubber.add_client_error(
+                        "describe_replication_groups",
+                        "ReplicationGroupNotFoundFault",
+                        expected_params=describe_params,
+                    )
+                    stubber.add_response(
+                        "create_replication_group",
+                        {"ReplicationGroup": {**group, "Status": "creating"}},
+                        {
+                            **describe_params,
+                            "ReplicationGroupDescription": "Caché de políticas de comercios Axiz",
+                            "Engine": "redis",
+                            "CacheNodeType": "cache.t3.micro",
+                            "NumCacheClusters": 1,
+                            "AutomaticFailoverEnabled": False,
+                            "MultiAZEnabled": False,
+                            "Port": 6379,
+                        },
+                    )
+                stubber.add_response(
+                    "describe_replication_groups",
+                    {"ReplicationGroups": [group]},
+                    describe_params,
+                )
+                with patch.object(bootstrap, "client", return_value=cache):
+                    self.assertEqual(bootstrap.managed_cache(), group)
+                stubber.assert_no_pending_responses()
+
+    def test_creates_redis_with_the_replication_group_api(self):
+        self.exercise_cache(False)
+
+    def test_reuses_an_existing_replication_group(self):
+        self.exercise_cache(True)
 
 
 if __name__ == "__main__":

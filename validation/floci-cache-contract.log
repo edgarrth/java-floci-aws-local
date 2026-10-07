@@ -1,0 +1,4 @@
+Floci 2.1.0: CreateReplicationGroup/DescribeReplicationGroups, un nodo, puerto 6379 y reutilización aprobados.
+Floci 2.1.0: APIs CreateCluster/DescribeCluster/GetBootstrapBrokers de MSK aprobadas en modo mock.
+Floci 2.1.0: aprovisionamiento de API Gateway con las cinco rutas aprobado.
+Límite: se verificó el plano de control; no se levantaron motores Redis/MSK ni pods.

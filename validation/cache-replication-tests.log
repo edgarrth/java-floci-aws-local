@@ -1,0 +1,19 @@
+test_does_not_hide_permission_errors (test_bootstrap.BootstrapTest.test_does_not_hide_permission_errors) ... Se consulta el recurso tras una creación sin respuesta concluyente.
+ok
+test_fails_immediately_for_a_failed_cluster (test_bootstrap.BootstrapTest.test_fails_immediately_for_a_failed_cluster) ... ok
+test_limits_reconciliation_without_repeating_creation (test_bootstrap.BootstrapTest.test_limits_reconciliation_without_repeating_creation) ... Se consulta el recurso tras una creación sin respuesta concluyente.
+ok
+test_reconciles_a_lost_reply_using_list_without_recreating (test_bootstrap.BootstrapTest.test_reconciles_a_lost_reply_using_list_without_recreating) ... Se consulta el recurso tras una creación sin respuesta concluyente.
+ok
+test_reconciles_already_exists_while_creation_is_pending (test_bootstrap.BootstrapTest.test_reconciles_already_exists_while_creation_is_pending) ... Se consulta el recurso tras una creación sin respuesta concluyente.
+ok
+test_lost_response_is_reconciled_with_real_sdk_without_duplicate_request (test_bootstrap.ControlPlaneWireTest.test_lost_response_is_reconciled_with_real_sdk_without_duplicate_request) ... Se consulta el recurso tras una creación sin respuesta concluyente.
+ok
+test_slow_response_completes_with_one_sdk_request (test_bootstrap.ControlPlaneWireTest.test_slow_response_completes_with_one_sdk_request) ... ok
+test_creates_redis_with_the_replication_group_api (test_bootstrap.ManagedCacheTest.test_creates_redis_with_the_replication_group_api) ... ok
+test_reuses_an_existing_replication_group (test_bootstrap.ManagedCacheTest.test_reuses_an_existing_replication_group) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 1.202s
+
+OK

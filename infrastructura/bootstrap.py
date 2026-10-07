@@ -64,6 +64,7 @@ EXISTING_CODES = frozenset(
         "BucketAlreadyOwnedByYou",
         "CacheClusterAlreadyExists",
         "CacheClusterAlreadyExistsFault",
+        "ReplicationGroupAlreadyExistsFault",
     }
 )
 TRANSIENT_CODES = frozenset(
@@ -619,21 +620,40 @@ def policies(iam, resource, db_resource):
         )
 
 
-def managed_engines():
+def managed_cache():
     cache = client("elasticache")
     ensure(
-        lambda: cache.describe_cache_clusters(
-            CacheClusterId="axiz-policies", ShowCacheNodeInfo=True
-        ),
-        lambda: cache.create_cache_cluster(
-            CacheClusterId="axiz-policies",
+        lambda: cache.describe_replication_groups(ReplicationGroupId="axiz-policies")[
+            "ReplicationGroups"
+        ][0],
+        lambda: cache.create_replication_group(
+            ReplicationGroupId="axiz-policies",
+            ReplicationGroupDescription="Caché de políticas de comercios Axiz",
             Engine="redis",
             CacheNodeType="cache.t3.micro",
-            NumCacheNodes=1,
+            NumCacheClusters=1,
+            AutomaticFailoverEnabled=False,
+            MultiAZEnabled=False,
             Port=6379,
-        ),
-        {"CacheClusterNotFound", "CacheClusterNotFoundFault"},
+        )["ReplicationGroup"],
+        {"ReplicationGroupNotFoundFault"},
     )
+    return wait(
+        lambda: ready(
+            cache.describe_replication_groups(ReplicationGroupId="axiz-policies")[
+                "ReplicationGroups"
+            ][0],
+            "Status",
+            "available",
+            "ElastiCache Redis",
+        ),
+        "ElastiCache Redis",
+        retryable_codes={"ReplicationGroupNotFoundFault"},
+    )
+
+
+def managed_engines():
+    managed_cache()
     kafka = client("kafka")
     msk = ensure(
         lambda: next(

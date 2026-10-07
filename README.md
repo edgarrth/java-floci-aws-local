@@ -23,7 +23,7 @@ La decisión y dos entregas outbox se confirman en la misma transacción Postgre
 | MSK | Se publica Kafka con `acks=all` e idempotencia del productor | Se consulta una auditoría persistida por el consumidor con partición y offset |
 | DynamoDB | Se materializan comprobantes y auditoría independiente | Se utiliza escritura condicional para impedir cambios del mismo evento |
 | Secrets Manager y SSM | Se almacenan claves de API y políticas del comercio | Se recuperan con credenciales temporales del rol correspondiente |
-| Redis administrado | Se consulta ElastiCache mediante su proxy | La política sigue disponible desde SSM cuando falla la caché |
+| Redis administrado | Se crea un replication group ElastiCache de un nodo y se consulta su proxy | Se espera `available`; la política sigue disponible desde SSM cuando falla la caché |
 | S3 y KMS | Se guardan comprobantes versionados y firmas RSA-PSS | Se verifica la firma de los bytes almacenados en S3 |
 | CloudWatch | Se envían métricas y se aprovisiona una alarma de volumen | Se consulta la configuración y se prueban permisos de publicación |
 | VPC y subnets | Se crean los recursos de red requeridos por las APIs EKS/MSK | Se reutilizan identificadores reales del plano de control emulado |
@@ -391,7 +391,9 @@ Se conserva en `validation/` la compilación con JDK 25/Maven, **27 pruebas apro
 
 Para la corrección de la primera ejecución se repiten la instalación del wrapper con caché vacía y SHA-512, la preparación de dependencias, el empaquetado offline de cada servicio y `verify` con JDK 25. Se aprueban nuevamente 19 pruebas de dominio y Spotless; se omiten las ocho pruebas AWS y las cuatro PostgreSQL en esta ejecución. Se validan las configuraciones de los perfiles EKS, completo, host y construcción con Docker Compose 5.6.0, además de ShellCheck y sintaxis Python. Se conservan los registros adicionales y los resultados en `validation/first-run-fix.json`.
 
-La recuperación del aprovisionador se verifica con siete pruebas aprobadas, incluidas dos del SDK boto3 real contra un servidor HTTP local que simula respuestas lentas o perdidas. Se conservan los resultados en `validation/bootstrap-recovery-tests.log`. Estas pruebas no descargan motores ni levantan Kubernetes.
+La recuperación del aprovisionador y el contrato SDK de Redis se verifican con nueve pruebas aprobadas, incluidas dos del SDK boto3 real contra un servidor HTTP local que simula respuestas lentas o perdidas. Se comprueba la creación y reutilización de grupos ElastiCache. Se conservan los resultados en `validation/cache-replication-tests.log`.
+
+Se verifica adicionalmente con el binario oficial Floci 2.1.0 la creación, consulta y reutilización de un grupo Redis de un nodo, las APIs MSK de creación/consulta/brokers en modo mock y las cinco rutas de API Gateway. Se conserva `validation/floci-cache-contract.log`. Esta comprobación valida las APIs del emulador sin descargar ni arrancar motores Redis/MSK o pods Kubernetes.
 
 **El entorno de generación no dispone de Docker. El despliegue completo Compose/EKS, la ejecución end-to-end de las aplicaciones con sus motores y las cuatro pruebas PostgreSQL quedan pendientes de ejecución en Fedora WSL.** Las pruebas de protocolo no prueban pods, conexiones físicas a Aurora ni el broker MSK.
 
@@ -430,6 +432,8 @@ Si una versión anterior termina con código 127 al ejecutar `mvnw` en `Dockerfi
 
 Durante la primera ejecución, Floci descarga y arranca los motores dentro de solicitudes del plano de control. Un timeout corto seguido de un reintento puede duplicar `CreateCluster` o `CreateDBCluster` mientras la primera solicitud sigue activa. Se mantiene un timeout amplio y se desactivan las repeticiones automáticas del SDK del aprovisionador. Ante una respuesta perdida o un recurso ya existente, `ensure` consulta su estado sin reenviar la creación; `wait` limita la espera y propaga los errores de permisos. Se recuperan los metadatos actuales de Aurora después de alcanzar `available`.
 
+Redis se aprovisiona con `CreateReplicationGroup` y se descubre con `DescribeReplicationGroups`. Se utiliza un nodo primario, sin réplicas ni failover, para comprobar la caché con un solo motor. En Floci 2.1.0, `CreateCacheCluster` se reserva para Memcached; una solicitud con `Engine=redis` devuelve `InvalidParameterValue`. Se conserva la reconciliación por lectura si el grupo ya existe o se pierde la respuesta.
+
 Si una ejecución anterior termina con `DBClusterAlreadyExistsFault` o un conflicto de nombre de k3s, se actualizan los archivos del proyecto y se repite el comando EKS con `--build`. Se reconstruye la imagen de herramientas con el aprovisionador corregido y se reutilizan los recursos existentes. Se conserva el cluster EKS si ya se encuentra en `ACTIVE`; un estado `FAILED` requiere revisar los logs del motor antes de continuar.
 
 Se interrumpen procesos de primer plano con Ctrl+C y se detiene Compose:
@@ -446,6 +450,8 @@ Los motores auxiliares se crean desde Floci y pueden permanecer fuera del conjun
 - [Aurora/RDS emulados](https://github.com/floci-io/floci/blob/2.1.0/docs/services/rds.md).
 - [EKS y emisión OIDC](https://github.com/floci-io/floci/blob/2.1.0/docs/services/eks.md).
 - [MSK emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/msk.md).
+- [ElastiCache emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/elasticache.md).
+- [Grupos de replicación Redis/Valkey](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_CreateReplicationGroup.html).
 - [Resolución de recursos IAM de Floci](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/iam/ResourceArnBuilder.java).
 - [Requisitos de Spring Boot](https://docs.spring.io/spring-boot/system-requirements.html).
 - [Construcción de imágenes y dependencias en Compose](https://docs.docker.com/reference/compose-file/build/).
