@@ -359,7 +359,7 @@ Con infraestructura y aplicaciones levantadas se ejecuta todo desde la raíz:
 bash scripts/test.sh all
 ```
 
-Se incluyen compilación, formato Java, pruebas de dominio, pruebas PostgreSQL con Testcontainers, pruebas AWS SDK contra Floci, sintaxis Python/shell, smoke REST, API Gateway y verificaciones de identidad IAM, TLS, aislamiento SQL y firmas KMS en S3. Se ejecutan sin tráfico concurrente ajeno al laboratorio y con la política inicial del dataset. La prueba SNS publica un evento técnico rechazado, sin asientos contables.
+Se incluyen compilación, formato Java, pruebas de dominio, pruebas PostgreSQL con Testcontainers, pruebas AWS SDK contra Floci, recuperación del aprovisionador, sintaxis Python/shell, smoke REST, API Gateway y verificaciones de identidad IAM, TLS, aislamiento SQL y firmas KMS en S3. Se ejecutan sin tráfico concurrente ajeno al laboratorio y con la política inicial del dataset. La prueba SNS publica un evento técnico rechazado, sin asientos contables.
 
 Para EKS se utilizan las rutas del nodo:
 
@@ -379,11 +379,19 @@ La suite AWS SDK se activa con `RUN_FLOCI_IT=true` y la PostgreSQL con `RUN_POST
 docker compose -f infrastructura/compose.yml run --rm --no-deps bootstrap python3 infrastructura/verify_aws.py
 ```
 
+Se comprueba la recuperación de creaciones lentas y respuestas perdidas con el SDK boto3 real contra un servidor HTTP local de prueba. Se verifica una sola solicitud de creación, la reconciliación posterior por lectura, la espera limitada y el rechazo inmediato de errores de permisos. Estas pruebas se ejecutan al construir la imagen de herramientas y durante `scripts/test.sh all`. Se pueden repetir sin iniciar Floci:
+
+```bash
+docker compose -f infrastructura/compose.yml run --rm --no-deps bootstrap python3 -m unittest discover -s infrastructura/tests -v
+```
+
 ## Evidencia y límites de la emulación
 
 Se conserva en `validation/` la compilación con JDK 25/Maven, **27 pruebas aprobadas: 19 de dominio y 8 del SDK Java contra Floci**, las comprobaciones de formato y los protocolos AWS contra Floci 2.1.0. Se ejecutan pruebas del SDK Java real para identidad web, SSM, Secrets Manager, SNS, KMS, escritura condicional DynamoDB y separación de permisos. Se comprueban adicionalmente SNS/SQS, S3, KMS y API Gateway con un backend HTTP de prueba.
 
 Para la corrección de la primera ejecución se repiten la instalación del wrapper con caché vacía y SHA-512, la preparación de dependencias, el empaquetado offline de cada servicio y `verify` con JDK 25. Se aprueban nuevamente 19 pruebas de dominio y Spotless; se omiten las ocho pruebas AWS y las cuatro PostgreSQL en esta ejecución. Se validan las configuraciones de los perfiles EKS, completo, host y construcción con Docker Compose 5.6.0, además de ShellCheck y sintaxis Python. Se conservan los registros adicionales y los resultados en `validation/first-run-fix.json`.
+
+La recuperación del aprovisionador se verifica con siete pruebas aprobadas, incluidas dos del SDK boto3 real contra un servidor HTTP local que simula respuestas lentas o perdidas. Se conservan los resultados en `validation/bootstrap-recovery-tests.log`. Estas pruebas no descargan motores ni levantan Kubernetes.
 
 **El entorno de generación no dispone de Docker. El despliegue completo Compose/EKS, la ejecución end-to-end de las aplicaciones con sus motores y las cuatro pruebas PostgreSQL quedan pendientes de ejecución en Fedora WSL.** Las pruebas de protocolo no prueban pods, conexiones físicas a Aurora ni el broker MSK.
 
@@ -420,6 +428,10 @@ Ante un rechazo STS se comprueban el renovador, audiencia, sujeto y rol. Si una 
 
 Si una versión anterior termina con código 127 al ejecutar `mvnw` en `Dockerfile.base`, se actualizan el Dockerfile y el wrapper y se repite `up --build`: se instalan las herramientas de descarga antes de preparar Maven. Un mensaje `pull access denied` para `axiz-tools` indica que se está utilizando la configuración anterior; se actualizan los archivos Compose con la política de imágenes locales. Se conservan `.env`, `.runtime/` y los volúmenes al reemplazar los archivos del proyecto.
 
+Durante la primera ejecución, Floci descarga y arranca los motores dentro de solicitudes del plano de control. Un timeout corto seguido de un reintento puede duplicar `CreateCluster` o `CreateDBCluster` mientras la primera solicitud sigue activa. Se mantiene un timeout amplio y se desactivan las repeticiones automáticas del SDK del aprovisionador. Ante una respuesta perdida o un recurso ya existente, `ensure` consulta su estado sin reenviar la creación; `wait` limita la espera y propaga los errores de permisos. Se recuperan los metadatos actuales de Aurora después de alcanzar `available`.
+
+Si una ejecución anterior termina con `DBClusterAlreadyExistsFault` o un conflicto de nombre de k3s, se actualizan los archivos del proyecto y se repite el comando EKS con `--build`. Se reconstruye la imagen de herramientas con el aprovisionador corregido y se reutilizan los recursos existentes. Se conserva el cluster EKS si ya se encuentra en `ACTIVE`; un estado `FAILED` requiere revisar los logs del motor antes de continuar.
+
 Se interrumpen procesos de primer plano con Ctrl+C y se detiene Compose:
 
 ```bash
@@ -438,5 +450,6 @@ Los motores auxiliares se crean desde Floci y pueden permanecer fuera del conjun
 - [Requisitos de Spring Boot](https://docs.spring.io/spring-boot/system-requirements.html).
 - [Construcción de imágenes y dependencias en Compose](https://docs.docker.com/reference/compose-file/build/).
 - [Política de descarga de imágenes locales en Compose](https://docs.docker.com/reference/compose-file/services/#pull_policy).
+- [Timeouts e intentos totales de botocore](https://docs.aws.amazon.com/botocore/latest/reference/config.html).
 - [Autenticación IAM de Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.html).
 - [Roles por ServiceAccount en EKS](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html).

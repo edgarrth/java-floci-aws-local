@@ -14,7 +14,13 @@ import urllib.request
 import boto3
 import psycopg
 from botocore.config import Config
-from botocore.exceptions import ClientError
+from botocore.exceptions import (
+    ClientError,
+    ConnectionClosedError,
+    ConnectTimeoutError,
+    EndpointConnectionError,
+    ReadTimeoutError,
+)
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / ".runtime"
@@ -23,7 +29,54 @@ REGION = os.environ.get("AWS_REGION", "us-east-1")
 ENDPOINT = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
 ACCOUNT = "000000000000"
 CLUSTER = "axiz-payments"
-CONFIG = Config(retries={"max_attempts": 3, "mode": "standard"}, connect_timeout=3, read_timeout=30)
+
+
+def positive_seconds(name, default):
+    value = int(os.environ.get(name, default))
+    if value <= 0:
+        raise ValueError(name + " debe ser un número entero mayor que cero")
+    return value
+
+
+READ_TIMEOUT = positive_seconds("FLOCI_BOOTSTRAP_READ_TIMEOUT_SECONDS", 900)
+WAIT_TIMEOUT = positive_seconds("FLOCI_BOOTSTRAP_WAIT_TIMEOUT_SECONDS", 1800)
+# Se espera la descarga y el arranque del motor sin repetir mutaciones desde el SDK.
+CONFIG = Config(
+    retries={"total_max_attempts": 1, "mode": "standard"},
+    connect_timeout=5,
+    read_timeout=READ_TIMEOUT,
+)
+TRANSPORT_ERRORS = (
+    ConnectionClosedError,
+    ConnectTimeoutError,
+    EndpointConnectionError,
+    ReadTimeoutError,
+)
+WAIT_ERRORS = TRANSPORT_ERRORS + (OSError, psycopg.OperationalError)
+EXISTING_CODES = frozenset(
+    {
+        "DBClusterAlreadyExistsFault",
+        "ResourceInUseException",
+        "EntityAlreadyExists",
+        "EntityAlreadyExistsException",
+        "ResourceExistsException",
+        "ParameterAlreadyExists",
+        "BucketAlreadyOwnedByYou",
+        "CacheClusterAlreadyExists",
+        "CacheClusterAlreadyExistsFault",
+    }
+)
+TRANSIENT_CODES = frozenset(
+    {
+        "Throttling",
+        "ThrottlingException",
+        "TooManyRequestsException",
+        "RequestTimeout",
+        "RequestTimeoutException",
+        "ServiceUnavailable",
+        "ServiceUnavailableException",
+    }
+)
 
 
 def client(service):
@@ -32,24 +85,48 @@ def client(service):
 
 def ensure(describe, create, missing):
     try:
-        return describe()
+        resource = describe()
+        if resource is not None:
+            return resource
     except ClientError as error:
         if error.response["Error"]["Code"] not in missing:
             raise
+    try:
         return create()
+    except ClientError as error:
+        if error.response["Error"]["Code"] not in EXISTING_CODES:
+            raise
+    except (ConnectionClosedError, ReadTimeoutError):
+        pass
+    # Una respuesta perdida no cancela la operación que sigue ejecutándose en Floci.
+    # Se reconcilia por lectura; no se vuelve a enviar la creación.
+    print("Se consulta el recurso tras una creación sin respuesta concluyente.", flush=True)
+    return wait(describe, "reconciliación del recurso", retryable_codes=missing)
 
 
-def wait(check, description, seconds=240):
+def wait(check, description, seconds=WAIT_TIMEOUT, retryable_codes=frozenset()):
     deadline = time.monotonic() + seconds
+    last_error = None
     while time.monotonic() < deadline:
         try:
             value = check()
             if value:
                 return value
-        except (ClientError, OSError, psycopg.OperationalError):
-            pass
+        except ClientError as error:
+            if error.response["Error"]["Code"] not in TRANSIENT_CODES | set(retryable_codes):
+                raise
+            last_error = error
+        except WAIT_ERRORS as error:
+            last_error = error
         time.sleep(2)
-    raise TimeoutError("Se agotó la espera de " + description)
+    raise TimeoutError("Se agotó la espera de " + description) from last_error
+
+
+def ready(resource, field, expected, description):
+    state = resource[field]
+    if state.upper() in {"FAILED", "DELETING", "DELETED", "INCOMPATIBLE-NETWORK"}:
+        raise RuntimeError(description + " se encuentra en estado " + state)
+    return resource if state == expected else None
 
 
 def token(service, path=None):
@@ -134,13 +211,9 @@ def identity(iam, eks):
         {"ResourceNotFoundException"},
     )
     cluster = wait(
-        lambda: (
-            c
-            if (c := eks.describe_cluster(name=CLUSTER)["cluster"])["status"] == "ACTIVE"
-            else None
-        ),
+        lambda: ready(eks.describe_cluster(name=CLUSTER)["cluster"], "status", "ACTIVE", "EKS"),
         "EKS",
-        360,
+        retryable_codes={"ResourceNotFoundException"},
     )
     issuer = cluster["identity"]["oidc"]["issuer"].removeprefix("https://")
     provider_arn = f"arn:aws:iam::{ACCOUNT}:oidc-provider/{issuer}"
@@ -327,7 +400,7 @@ def resources():
 def database():
     rds = client("rds")
     password = os.environ.get("DB_ADMIN_PASSWORD", "LocalBootstrapOnly-25!")
-    cluster = ensure(
+    ensure(
         lambda: rds.describe_db_clusters(DBClusterIdentifier="axiz-ledger")["DBClusters"][0],
         lambda: rds.create_db_cluster(
             DBClusterIdentifier="axiz-ledger",
@@ -341,12 +414,15 @@ def database():
         )["DBCluster"],
         {"DBClusterNotFoundFault"},
     )
-    wait(
-        lambda: (
-            rds.describe_db_clusters(DBClusterIdentifier="axiz-ledger")["DBClusters"][0]["Status"]
-            == "available"
+    cluster = wait(
+        lambda: ready(
+            rds.describe_db_clusters(DBClusterIdentifier="axiz-ledger")["DBClusters"][0],
+            "Status",
+            "available",
+            "Aurora",
         ),
         "Aurora",
+        retryable_codes={"DBClusterNotFoundFault"},
     )
     db_host = "floci" if ENDPOINT.startswith("http://floci") else "localhost"
     db_port = int(cluster["Port"])
@@ -559,10 +635,16 @@ def managed_engines():
         {"CacheClusterNotFound", "CacheClusterNotFoundFault"},
     )
     kafka = client("kafka")
-    clusters = kafka.list_clusters()["ClusterInfoList"]
-    msk = next((c for c in clusters if c["ClusterName"] == "axiz-events"), None)
-    if not msk:
-        msk = kafka.create_cluster(
+    msk = ensure(
+        lambda: next(
+            (
+                c
+                for c in kafka.list_clusters()["ClusterInfoList"]
+                if c["ClusterName"] == "axiz-events"
+            ),
+            None,
+        ),
+        lambda: kafka.create_cluster(
             ClusterName="axiz-events",
             KafkaVersion="4.2.1",
             NumberOfBrokerNodes=1,
@@ -570,12 +652,19 @@ def managed_engines():
                 "InstanceType": "kafka.m5.large",
                 "ClientSubnets": [networking()[0]],
             },
-        )
+        ),
+        set(),
+    )
     cluster_arn = msk["ClusterArn"]
     wait(
-        lambda: kafka.describe_cluster(ClusterArn=cluster_arn)["ClusterInfo"]["State"] == "ACTIVE",
+        lambda: ready(
+            kafka.describe_cluster(ClusterArn=cluster_arn)["ClusterInfo"],
+            "State",
+            "ACTIVE",
+            "MSK",
+        ),
         "MSK",
-        300,
+        retryable_codes={"NotFoundException"},
     )
     brokers = kafka.get_bootstrap_brokers(ClusterArn=cluster_arn)["BootstrapBrokerString"]
     names = subprocess.run(
