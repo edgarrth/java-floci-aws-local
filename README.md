@@ -1,18 +1,30 @@
-# Arquitectura de microservicios de pagos con Floci
+# Servicios AWS en local con Floci
 
-Se implementa una plataforma local de pagos cuyo **caso de uso técnico es probar una arquitectura de microservicios sobre Floci**: se aprovisionan recursos mediante APIs AWS, se utilizan clientes AWS SDK reales y se separan las identidades de ejecución y los datos de cada contexto. Se prueban API Gateway, Aurora PostgreSQL, SNS/SQS, MSK, DynamoDB, S3, Secrets Manager, Parameter Store, ElastiCache Redis, EKS, IAM, STS, KMS y CloudWatch.
+Se implementa una plataforma de pagos en AWS local sobre Floci: 
+se aprovisionan recursos mediante APIs AWS, se utilizan clientes AWS SDK reales y se separan las identidades de ejecución y los 
+datos de cada contexto. Se prueban API Gateway, Aurora PostgreSQL, SNS/SQS, MSK, DynamoDB, S3, Secrets Manager, Parameter Store, 
+ElastiCache Redis, EKS, IAM, STS, KMS y CloudWatch.
 
-Se conservan **dos microservicios REST**: `payment-service` registra órdenes de pago y `settlement-service` procesa liquidación, comprobantes y auditoría. La separación permite comprobar comunicación asíncrona y permisos distintos sin añadir un servicio dedicado a simular fallos. `platform` es una biblioteca compartida; no se ejecuta ni despliega como servicio.
+Se conservan **dos microservicios REST**: `payment-service` registra órdenes de pago y `settlement-service` procesa liquidación, 
+comprobantes y auditoría. La separación permite comprobar comunicación asíncrona y permisos distintos sin añadir un servicio 
+dedicado a simular fallos. `platform` es una biblioteca compartida; no se ejecuta ni despliega como servicio.
 
 ## Caso funcional
 
-Se registra una orden tokenizada para un comercio y se consulta su límite operativo en Parameter Store, con caché Redis de 30 segundos. Se devuelve `ACCEPTED` cuando el monto cumple la política o `REJECTED` cuando supera el límite. Se utiliza `Idempotency-Key` para recuperar la misma operación sin generar eventos duplicados. El alcance financiero se limita al registro de órdenes y la contabilidad del laboratorio.
+Se registra una orden tokenizada para un comercio y se consulta su límite operativo en Parameter Store, con caché Redis de 30 segundos. 
+Se devuelve `ACCEPTED` cuando el monto cumple la política o `REJECTED` cuando supera el límite. Se utiliza `Idempotency-Key` para 
+recuperar la misma operación sin generar eventos duplicados. El alcance financiero se limita al registro de órdenes y la contabilidad 
+del laboratorio.
 
-La decisión y dos entregas outbox se confirman en la misma transacción PostgreSQL. SNS/SQS transporta la orden hacia liquidación; MSK conserva el flujo para auditoría. En liquidación se registra inbox, se generan dos asientos balanceados para pagos aceptados y se prepara el comprobante. Los pagos rechazados reciben un comprobante sin asientos. Se firma el contenido con KMS, se publica en S3 y se actualiza la proyección de consulta en DynamoDB.
+La decisión y dos entregas outbox se confirman en la misma transacción PostgreSQL. SNS/SQS transporta la orden hacia liquidación; 
+MSK conserva el flujo para auditoría. En liquidación se registra inbox, se generan dos asientos balanceados para pagos aceptados y 
+se prepara el comprobante. Los pagos rechazados reciben un comprobante sin asientos. Se firma el contenido con KMS, se publica en S3 
+y se actualiza la proyección de consulta en DynamoDB.
 
-## Servicios AWS utilizados mediante Floci
+## Servicios AWS locales mediante Floci
 
-Se aprovisionan recursos mediante boto3 y se consumen mediante AWS SDK Java v2. Se conservan ARN, endpoints y región descubiertos en `.runtime/`. El uso de cada servicio se vincula al flujo de pagos o a su despliegue:
+Se aprovisionan recursos mediante boto3 y se consumen mediante AWS SDK Java v2. Se conservan ARN, endpoints y región descubiertos en 
+`.runtime/`. El uso de cada servicio se vincula al flujo de pagos o a su despliegue:
 
 | Servicio AWS | Aplicación en la PoC | Comprobación |
 |---|---|---|
@@ -33,7 +45,10 @@ Se aprovisionan recursos mediante boto3 y se consumen mediante AWS SDK Java v2. 
 | CloudWatch | Se envían métricas y se aprovisiona una alarma de volumen | Se consulta la configuración y se prueban permisos de publicación |
 | API EC2: VPC y subredes | Se crean los recursos de red requeridos por EKS y MSK | Se reutilizan sus identificadores del plano de control; no se crean máquinas EC2 |
 
-Se mantienen únicamente recursos asociados al flujo. Aurora cubre el almacenamiento relacional y se administra mediante la API RDS; no se crea otra instancia RDS. El flujo de auditoría se implementa con MSK. ECR permanece deshabilitado porque se importan imágenes locales en containerd. OIDC pertenece al mecanismo de identidad y no se contabiliza como otro servicio AWS. La VPC y las subredes representan recursos del plano de control emulado, sin reproducir aislamiento físico de red AWS.
+Se mantienen únicamente recursos asociados al flujo. Aurora cubre el almacenamiento relacional y se administra mediante la API RDS; 
+no se crea otra instancia RDS. El flujo de auditoría se implementa con MSK. ECR permanece deshabilitado porque se importan imágenes 
+locales en containerd. OIDC pertenece al mecanismo de identidad y no se contabiliza como otro servicio AWS. La VPC y las subredes 
+representan recursos del plano de control emulado, sin reproducir aislamiento físico de red AWS.
 
 ## Arquitectura
 
@@ -60,9 +75,13 @@ flowchart TD
   Receipt --> Projection
 ```
 
-API Gateway y las APIs AWS se emulan dentro de Floci. Floci crea contenedores reales para PostgreSQL, Redis y Redpanda; en el modo EKS también crea k3s. No se declara otro PostgreSQL, Redis o Kafka en Compose porque se duplicaría la infraestructura administrada por el emulador. Secrets Manager y CloudWatch se consumen desde los dos servicios.
+API Gateway y las APIs AWS se emulan dentro de Floci. Floci crea contenedores reales para PostgreSQL, Redis y Redpanda; en el modo 
+EKS también crea k3s. No se declara otro PostgreSQL, Redis o Kafka en Compose porque se duplicaría la infraestructura administrada por
+el emulador. Secrets Manager y CloudWatch se consumen desde los dos servicios.
 
-Se resuelve el broker MSK mediante las etiquetas Docker de servicio, recurso, cuenta y región en `axiz-network`. Se cruza la dirección devuelta por `GetBootstrapBrokers` con la inspección del contenedor y se conserva su nombre DNS, que Redpanda anuncia a los clientes Kafka. Se admiten nombres basados en identificadores de volumen, como `floci-msk-dfda92`, sin depender del nombre del clúster. Se rechaza la selección cuando el broker no existe, está detenido o resulta ambiguo.
+Se resuelve el broker MSK mediante las etiquetas Docker de servicio, recurso, cuenta y región en `axiz-network`. Se cruza la 
+dirección devuelta por `GetBootstrapBrokers` con la inspección del contenedor y se conserva su nombre DNS, que Redpanda anuncia a 
+los clientes Kafka. Se admiten nombres basados en identificadores de volumen, como `floci-msk-dfda92`, sin depender del nombre del clúster. Se rechaza la selección cuando el broker no existe, está detenido o resulta ambiguo.
 
 ## Tecnologías y versiones
 
@@ -82,7 +101,6 @@ Se resuelve el broker MSK mediante las etiquetas Docker de servicio, recurso, cu
 | Spotless / Google Java Format | 3.0.0 / 1.33.0 | Formato Java comprobado durante `verify` |
 | boto3 / psycopg | 1.43.108 / 3.3.6 | Aprovisionamiento y validación AWS/PostgreSQL |
 
-Se heredan las versiones compatibles de Spring, Jackson, JDBC, Flyway y Kafka desde el BOM de Spring Boot. Se importan las versiones AWS desde su BOM. Se seleccionan clientes SDK directos para evitar introducir una integración Spring Cloud AWS sin compatibilidad comprobada con Spring Boot 4.1.
 
 ## Estructura del proyecto
 
@@ -97,7 +115,6 @@ Se heredan las versiones compatibles de Spring, Jackson, JDBC, Flyway y Kafka de
 | `.env.example`, `application.yml.example` | Ejemplos de configuración y comentarios sobre los valores admitidos |
 | `pom.xml`, `mvnw` | Reactor Maven importable en el IDE y lanzador Linux |
 
-Se utiliza el paquete raíz `pe.axiz`. Se conserva la organización hexagonal de la plantilla: `domain`, `application/ports`, `application/service`, `adapters/in`, `adapters/out` y `configuration`. El dominio no depende de Spring ni de AWS.
 
 ## Código principal
 
@@ -113,9 +130,7 @@ Se utiliza el paquete raíz `pe.axiz`. Se conserva la organización hexagonal de
 
 `AwsConfiguration` usa `StsWebIdentityTokenFileCredentialsProvider` con renovación asíncrona. `IamDataSource` genera un token RDS al crear cada conexión física; Hikari conserva conexiones, no una contraseña IAM estática. Se verifica la CA y el hostname con TLS. `DatabaseConfiguration` configura el esquema en Hikari: se ejecuta `Connection.setSchema` después de autenticar la conexión y se restaura ese esquema si se modifica durante un préstamo. Esta selección permite atravesar el proxy de Floci, que no transmite las opciones del mensaje inicial PostgreSQL. `PlatformIdentityController` consulta la identidad AWS y ejecuta `DatabaseIdentity.inspect` sobre una única conexión JDBC. Se devuelven el usuario, el esquema, `sslMode` leído de los metadatos de esa conexión abierta y `backendTls` obtenido de `pg_stat_ssl`; no se publica la URL JDBC ni sus credenciales. El driver exige `verify-full` al abrir cada conexión. El indicador del backend se informa por separado porque Floci termina TLS en su proxy.
 
-## Preparación en Fedora WSL
-
-Se requiere JDK 25, Python 3, curl, Docker Engine con Compose 2.20 o superior y conectividad para descargar dependencias e imágenes. En WSL se habilita systemd y se utiliza un daemon Docker accesible desde la distribución. Se recomienda asignar 8 GB de memoria al laboratorio y más capacidad al modo EKS.
+## Preparación
 
 ```bash
 sudo dnf install java-25-openjdk-devel python3 curl
@@ -126,17 +141,18 @@ chmod +x mvnw scripts/*.sh datasets/*.sh
 mkdir -p .runtime
 ```
 
-Se instala Docker según la [guía oficial para Fedora](https://docs.docker.com/engine/install/fedora/) si todavía no está disponible. Se ejecutan todos los comandos desde la raíz. La configuración se consulta en los archivos de ejemplo.
-
 ## Imágenes base reutilizables
 
-Compose construye primero una imagen Java que contiene las herramientas de descarga, Maven y las dependencias del reactor. Sólo se copian el wrapper y los POM en esa etapa, por lo que los cambios de código no invalidan la descarga de dependencias. Se construyen después las imágenes de herramientas y de los dos servicios. Se puede preparar este conjunto por separado:
+Compose construye primero una imagen Java que contiene las herramientas de descarga, Maven y las dependencias del reactor. Sólo se 
+copian el wrapper y los POM en esa etapa, por lo que los cambios de código no invalidan la descarga de dependencias. Se construyen 
+después las imágenes de herramientas y de los dos servicios. Se puede preparar este conjunto por separado:
 
 ```bash
 bash scripts/build-base.sh
 ```
 
-La imagen de herramientas contiene boto3, psycopg, Docker CLI, socat y las migraciones. Las imágenes de aplicación compilan offline sobre la base y ejecutan JRE con usuario no root. El paso separado es opcional cuando se utiliza `up --build`. Las imágenes `axiz-*` se construyen localmente; su política `pull_policy: never` evita búsquedas en Docker Hub. `--no-build` permite reutilizarlas después de una construcción completa. En EKS se importan las imágenes directamente en containerd; se deshabilita ECR en Floci porque el flujo no publica ni descarga imágenes desde ese registro.
+La imagen de herramientas contiene boto3, psycopg, Docker CLI, socat y las migraciones. Las imágenes de aplicación compilan offline 
+sobre la base y ejecutan JRE con usuario no root. El paso separado es opcional cuando se utiliza `up --build`. Las imágenes `axiz-*` se construyen localmente; su política `pull_policy: never` evita búsquedas en Docker Hub. `--no-build` permite reutilizarlas después de una construcción completa. En EKS se importan las imágenes directamente en containerd; se deshabilita ECR en Floci porque el flujo no publica ni descarga imágenes desde ese registro.
 
 Se importa el `pom.xml` raíz en el IDE y se selecciona JDK 25. La compilación local se realiza con:
 
@@ -146,7 +162,8 @@ Se importa el `pom.xml` raíz en el IDE y se selecciona JDK 25. La compilación 
 
 ## Ejecución en EKS administrado por Floci
 
-Se utiliza este modo para comprobar las conexiones a Aurora desde pods y ServiceAccounts. En la primera ejecución, después de la preparación del entorno, se construyen las imágenes y se inicia la infraestructura y el despliegue en primer plano con un solo comando:
+Se utiliza este modo para comprobar las conexiones a Aurora desde pods y ServiceAccounts. En la primera ejecución, después de la 
+preparación del entorno, se construyen las imágenes y se inicia la infraestructura y el despliegue en primer plano con un solo comando:
 
 ```bash
 docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --build
@@ -158,13 +175,24 @@ Se pueden reutilizar las imágenes existentes:
 docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks up --no-build
 ```
 
-El bootstrap crea recursos AWS, CA, roles, esquemas y migraciones. Las tareas `payment-image` y `settlement-image` construyen las imágenes de aplicación y terminan sin iniciar JVM ni publicar puertos; el despliegue espera su finalización y la del bootstrap. `eks.py` comprueba la API Kubernetes y containerd, importa las imágenes locales en el namespace `k8s.io`, verifica sus referencias y recupera la identidad del nodo local. Se aplican después ServiceAccounts, Deployments y Services. Se completa el rollout de ambos Deployments antes de comprobar sus rutas de servicio; después se precargan pagos y se muestran las rutas. Se conserva el manifiesto aplicado en `.runtime/deployment.local.yml`. Se incluyen huellas de imagen y configuración en el pod para provocar un rollout al actualizar el código o la CA. Se utiliza nuevamente `up --build` para aplicar cambios de código o de la imagen base.
+El bootstrap crea recursos AWS, CA, roles, esquemas y migraciones. Las tareas `payment-image` y `settlement-image` construyen las 
+imágenes de aplicación y terminan sin iniciar JVM ni publicar puertos; el despliegue espera su finalización y la del bootstrap. 
+`eks.py` comprueba la API Kubernetes y containerd, importa las imágenes locales en el namespace `k8s.io`, verifica sus referencias 
+y recupera la identidad del nodo local. Se aplican después ServiceAccounts, Deployments y Services. Se completa el rollout de ambos 
+Deployments antes de comprobar sus rutas de servicio; después se precargan pagos y se muestran las rutas. Se conserva el manifiesto 
+aplicado en `.runtime/deployment.local.yml`. Se incluyen huellas de imagen y configuración en el pod para provocar un rollout al 
+actualizar el código o la CA. Se utiliza nuevamente `up --build` para aplicar cambios de código o de la imagen base.
 
 En Floci 2.1.0 se puede recrear el contenedor k3s al reiniciar, reutilizando su volumen. El hostname Docker cambia y los nodos anteriores permanecen en el datastore Kubernetes. Se verifica el contenedor mediante nombre, etiquetas de clúster, cuenta y región, imagen k3s y montaje del volumen esperado. `k3s_image` reconoce la referencia `rancher/k3s:` y consulta las etiquetas de la imagen cuando Docker conserva un ID SHA-256. Se espera hasta 60 segundos su registro como Node y hasta 180 segundos su condición `Ready`. Se retiran únicamente registros anteriores con la identidad Docker de k3s cuando su contenedor ya no existe; se inspeccionan también contenedores detenidos y se comprueba de nuevo el runtime antes de cada operación. La eliminación se protege con el UID del objeto Node. Se espera hasta 120 segundos la limpieza de los pods huérfanos mediante PodGC. Se conservan contenedores existentes, volúmenes y recursos AWS. Este procedimiento pertenece al proveedor local de un único nodo; una topología diferente detiene la recuperación para diagnóstico.
 
-Se configura `RollingUpdate` con `maxUnavailable: 0`, `maxSurge: 1` y cinco segundos mínimos de readiness. Después del rollout se esperan, durante un máximo de 120 segundos, EndpointSlices con direcciones listas que no estén terminando y tres rondas consecutivas de readiness `UP` por ambos NodePorts, separadas por dos segundos. Se comprueba así la ruta HTTP que utilizará la precarga. Si falla el despliegue, se imprimen estado y descripción de nodos, pods, Services, EndpointSlices, eventos y los últimos logs de k3s. Se seleccionan explícitamente pods no terminantes del nodo actual para consultar logs de ambas aplicaciones. Se mantiene la salida de error y se conservan los recursos.
+Se configura `RollingUpdate` con `maxUnavailable: 0`, `maxSurge: 1` y cinco segundos mínimos de readiness. Después del rollout se 
+esperan, durante un máximo de 120 segundos, EndpointSlices con direcciones listas que no estén terminando y tres rondas consecutivas 
+de readiness `UP` por ambos NodePorts, separadas por dos segundos. Se comprueba así la ruta HTTP que utilizará la precarga. Si falla el despliegue, se imprimen estado y descripción de nodos, pods, Services, EndpointSlices, eventos y los últimos logs de k3s. Se seleccionan explícitamente pods no terminantes del nodo actual para consultar logs de ambas aplicaciones. Se mantiene la salida de error y se conservan los recursos.
 
-Los NodePorts pertenecen al contenedor k3s; Floci sólo publica directamente su API Kubernetes. El servicio Compose `eks-access` espera el despliegue y publica `127.0.0.1:30080` y `127.0.0.1:30081` mediante socat hacia los NodePorts en `axiz-network`. Se utiliza la misma imagen de herramientas, sin montar credenciales ni el socket Docker, con usuario sin privilegios y filesystem de sólo lectura. Se conserva el transporte TCP y se resuelve el nombre del nodo en cada conexión. Este acceso local permite ejecutar curl desde Fedora WSL, también con Docker Desktop; no representa un componente de AWS EKS. Las comprobaciones de salud del puente se ejecutan sin imprimir solicitudes periódicas en sus logs.
+Los NodePorts pertenecen al contenedor k3s; Floci sólo publica directamente su API Kubernetes. El servicio Compose `eks-access` 
+espera el despliegue y publica `127.0.0.1:30080` y `127.0.0.1:30081` mediante socat hacia los NodePorts en `axiz-network`. Se utiliza 
+la misma imagen de herramientas, sin montar credenciales ni el socket Docker, con usuario sin privilegios y filesystem de sólo lectura. 
+Se conserva el transporte TCP y se resuelve el nombre del nodo en cada conexión. Este acceso local permite ejecutar curl desde Fedora WSL, también con Docker Desktop; no representa un componente de AWS EKS. Las comprobaciones de salud del puente se ejecutan sin imprimir solicitudes periódicas en sus logs.
 
 Se espera el estado `healthy` de `eks-access` antes de probar el flujo desde otra terminal:
 
@@ -173,9 +201,15 @@ docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml -
 PAYMENT_URL=http://localhost:30080 SETTLEMENT_URL=http://localhost:30081 bash scripts/smoke.sh
 ```
 
-Se utilizan `axiz-payment` y `axiz-settlement` en el namespace `axiz`. Cada trust policy exige `system:serviceaccount:axiz:<service-account>` y audiencia `sts.amazonaws.com`. Se limita `rds-db:connect` al recurso del cluster y al usuario de cada contexto. Las aplicaciones no reciben claves AWS permanentes ni la contraseña de administración SQL.
+Se utilizan `axiz-payment` y `axiz-settlement` en el namespace `axiz`. Cada trust policy exige 
+`system:serviceaccount:axiz:<service-account>` y audiencia `sts.amazonaws.com`. Se limita `rds-db:connect` al recurso del cluster 
+y al usuario de cada contexto. Las aplicaciones no reciben claves AWS permanentes ni la contraseña de administración SQL.
 
-**Particularidad de Floci:** se obtiene el JWT firmado del endpoint OIDC local del emulador mediante un init container y un renovador. Se utilizan el ServiceAccount y namespace efectivos del pod mediante Downward API y un volumen en memoria. Este emisor local no atesta la identidad de un pod AWS real. La adaptación a AWS EKS utiliza tokens proyectados de Kubernetes; se incluye `infrastructura/kubernetes/aws-irsa-patch.yml` como base de esa adaptación. Se requieren ARN, endpoints, CA e imágenes publicados en el entorno AWS real.
+**Particularidad de Floci:** se obtiene el JWT firmado del endpoint OIDC local del emulador mediante un init container y un renovador. 
+Se utilizan el ServiceAccount y namespace efectivos del pod mediante Downward API y un volumen en memoria. Este emisor local no atesta 
+la identidad de un pod AWS real. La adaptación a AWS EKS utiliza tokens proyectados de Kubernetes; se incluye 
+`infrastructura/kubernetes/aws-irsa-patch.yml` como base de esa adaptación. Se requieren ARN, endpoints, CA e imágenes 
+publicados en el entorno AWS real.
 
 ```bash
 docker exec floci-eks-axiz-payments /bin/kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml -n axiz get pods
@@ -196,7 +230,8 @@ Se reutilizan las imágenes sin compilación con:
 docker compose -f infrastructura/compose.yml --profile full up --no-build
 ```
 
-En esta modalidad EKS mantiene metadatos y emisión OIDC para el laboratorio; no se crean pods. Los servicios se ejecutan en Compose con roles temporales. El archivo del modo EKS activa el motor Kubernetes real.
+En esta modalidad EKS mantiene metadatos y emisión OIDC para el laboratorio; no se crean pods. Los servicios se ejecutan en Compose 
+con roles temporales. El archivo del modo EKS activa el motor Kubernetes real.
 
 ## Infraestructura en Compose y aplicaciones en host
 
@@ -206,14 +241,17 @@ Se mantiene la infraestructura en primer plano en una terminal:
 docker compose -f infrastructura/compose.yml -f infrastructura/compose.host.yml up --build
 ```
 
-Después del mensaje de aprovisionamiento completado, se utiliza otra terminal para registrar el broker anunciado e iniciar los dos servicios:
+Después del mensaje de aprovisionamiento completado, se utiliza otra terminal para registrar el broker anunciado e iniciar los dos 
+servicios:
 
 ```bash
 sudo bash scripts/host-dns.sh
 bash scripts/run-host.sh
 ```
 
-`run-host.sh` compila, inicia las JVM, precarga pagos, muestra rutas y finaliza ambos procesos al recibir una interrupción. Se mantiene el renovador de identidad de Compose en ejecución. Si se reutilizan imágenes de infraestructura se sustituye `--build` por `--no-build`.
+`run-host.sh` compila, inicia las JVM, precarga pagos, muestra rutas y finaliza ambos procesos al recibir una interrupción. Se
+mantiene el renovador de identidad de Compose en ejecución. Si se reutilizan imágenes de infraestructura se sustituye `--build` por
+`--no-build`.
 
 ## Migraciones y precarga
 
@@ -231,9 +269,15 @@ En EKS se utiliza:
 bash datasets/seed.sh http://localhost:30080
 ```
 
-La precarga espera readiness hasta 240 segundos y limita cada POST a una ventana total de 120 segundos, con hasta 15 segundos por solicitud y espera progresiva de uno a cinco segundos. Se reintentan cortes de conexión, timeouts y respuestas HTTP 408, 429, 500, 502, 503 y 504 conservando exactamente la clave de idempotencia y el cuerpo originales. Si el pago se confirmó antes de perder la respuesta, se recupera por replay. Un HTTP 400, 401, 403, 404, 409 o 422, un certificado inválido o una respuesta mal formada detienen la carga. Se reemplaza el archivo de resultados de forma atómica únicamente después de confirmar todos los pagos como `ACCEPTED`; una carga parcial conserva el resultado anterior y puede recuperarse con las mismas claves.
+La precarga espera readiness hasta 240 segundos y limita cada POST a una ventana total de 120 segundos, con hasta 15 segundos por 
+solicitud y espera progresiva de uno a cinco segundos. Se reintentan cortes de conexión, timeouts y respuestas HTTP 408, 429, 500, 
+502, 503 y 504 conservando exactamente la clave de idempotencia y el cuerpo originales. Si el pago se confirmó antes de perder la 
+respuesta, se recupera por replay. Un HTTP 400, 401, 403, 404, 409 o 422, un certificado inválido o una respuesta mal formada detienen 
+la carga. Se reemplaza el archivo de resultados de forma atómica únicamente después de confirmar todos los pagos como `ACCEPTED`; una
+carga parcial conserva el resultado anterior y puede recuperarse con las mismas claves.
 
-Se utiliza un volumen `floci-data-v2` para este modelo. Al sustituir una versión anterior se detiene primero su stack y se utiliza un despliegue nuevo; no se aplica este esquema inicial sobre la historia Flyway anterior.
+Se utiliza un volumen `floci-data-v2` para este modelo. Al sustituir una versión anterior se detiene primero su stack y se utiliza un 
+despliegue nuevo; no se aplica este esquema inicial sobre la historia Flyway anterior.
 
 ## Endpoints en orden del flujo
 
@@ -255,7 +299,8 @@ Se utiliza un volumen `floci-data-v2` para este modelo. Al sustituir una versió
 | `GET /routes` | Ambos | Listar rutas al terminar el arranque | Catálogo de mappings REST |
 | `/error` | Ambos | Gestionar errores HTTP | Handler automático de Spring Boot; mappings HTML y general |
 
-Las rutas `/api/settlements/**` requieren `X-Api-Key`. Los puertos host/Compose son 8080 y 8081; los NodePorts EKS se publican en localhost mediante `eks-access` en 30080 y 30081. API Gateway publica las cinco rutas `/api/**` de la tabla. Se utilizan `X-Api-Key` y `X-Internal-Key` cargadas desde Secrets Manager al inicio; su rotación requiere reiniciar los servicios. Se propaga `X-Correlation-Id` o se genera un UUID cuando falta.
+Las rutas `/api/settlements/**` requieren `X-Api-Key`. Los puertos host/Compose son 8080 y 8081; los NodePorts EKS se publican en 
+localhost mediante `eks-access` en 30080 y 30081. API Gateway publica las cinco rutas `/api/**` de la tabla. Se utilizan `X-Api-Key` y `X-Internal-Key` cargadas desde Secrets Manager al inicio; su rotación requiere reiniciar los servicios. Se propaga `X-Correlation-Id` o se genera un UUID cuando falta.
 
 ## Pruebas por curl
 
@@ -290,7 +335,11 @@ Se devuelve una respuesta equivalente a:
 {"awsRole":"arn:aws:sts::000000000000:assumed-role/axiz-payment/payment-service","account":"000000000000","database":{"username":"axiz_payment","schema":"payment","sslMode":"verify-full","backendTls":false}}
 ```
 
-`sslMode: verify-full` corresponde al modo del driver de la conexión abierta: se exige cifrado y se validan la CA y el hostname durante el login. `backendTls` corresponde al tramo visto por PostgreSQL. En Floci se espera `false` porque el proxy termina TLS antes de conectarse al motor local. Se verifica el tramo cliente desde libpq mediante `connection.pgconn.ssl_in_use` en `verify_aws.py`, manteniendo `verify-full`, y se selecciona el esquema después del login IAM. Se conserva el aislamiento SQL entre servicios.
+`sslMode: verify-full` corresponde al modo del driver de la conexión abierta: se exige cifrado y se validan la CA y el hostname 
+durante el login. `backendTls` corresponde al tramo visto por PostgreSQL. En Floci se espera `false` porque el proxy termina TLS 
+antes de conectarse al motor local. Se verifica el tramo cliente desde libpq mediante `connection.pgconn.ssl_in_use` en 
+`verify_aws.py`, manteniendo `verify-full`, y se selecciona el esquema después del login IAM. Se conserva el aislamiento SQL entre 
+servicios.
 
 ### Registro e idempotencia
 
@@ -348,7 +397,8 @@ curl -fsS "$settlement/api/settlements/$id/ledger" -H "X-Api-Key: $api_key"
 curl -fsS "$settlement/api/settlements/$id/audit" -H "X-Api-Key: $api_key"
 ```
 
-La proyección devuelve `pk`, `status`, `amount`, `currency` y `receiptKey`. El ledger devuelve dos entradas `PAYMENT_CLEARING` y `MERCHANT_PAYABLE`, con importes 25.50 y -25.50 y suma cero. La auditoría devuelve `eventId`, `payload`, `partition` y `offset`; se conserva el contenido original publicado en MSK.
+La proyección devuelve `pk`, `status`, `amount`, `currency` y `receiptKey`. El ledger devuelve dos entradas `PAYMENT_CLEARING` y 
+`MERCHANT_PAYABLE`, con importes 25.50 y -25.50 y suma cero. La auditoría devuelve `eventId`, `payload`, `partition` y `offset`; se conserva el contenido original publicado en MSK.
 
 ### Rechazo por política
 
@@ -403,16 +453,6 @@ Se ejecutan las comprobaciones en este orden; cualquier fallo detiene el script 
 | `smoke.sh` | Registro, replay, conflicto HTTP 409, rechazo por límite, liquidación, balance contable, auditoría MSK, identidad de ambos servicios, acceso anónimo denegado y proxy API Gateway | Se imprimen todas las comprobaciones y el catálogo final de rutas |
 | `verify_aws.py` | STS y sujeto OIDC; permisos cruzados denegados; conexión física Aurora con token IAM y TLS `verify-full`; aislamiento SQL; entrega y confirmación SNS/SQS; verificación KMS de los bytes precargados en S3 | `Se completaron las verificaciones Floci.` |
 
-Se ejecuta sin tráfico concurrente ajeno al laboratorio y con la política inicial del dataset. La prueba SSM espera el límite `5000.00`. La prueba SNS publica un evento técnico rechazado, sin asientos contables; las pruebas de auditoría usan identificadores nuevos. Se conservan los resultados de precarga en `.runtime/dataset-results.json` para verificar sus comprobantes.
-
-Se comprueba el código de salida inmediatamente después del comando, en la misma terminal:
-
-```bash
-echo $?
-```
-
-Se espera `0`. El `BUILD SUCCESS` de Maven confirma únicamente la primera etapa; el conjunto completo termina después de las verificaciones Floci. Se trata de una validación funcional y de integración del laboratorio; no se incluyen pruebas de carga, fallo forzado hasta DLQ, renovación prolongada de credenciales ni alta disponibilidad de AWS.
-
 Se puede ejecutar sólo compilación y pruebas sin infraestructura:
 
 ```bash
@@ -430,24 +470,6 @@ Se comprueba la recuperación de creaciones lentas y respuestas perdidas con el 
 ```bash
 docker compose -f infrastructura/compose.yml run --rm --no-deps bootstrap python3 -m unittest discover -s infrastructura/tests -v
 ```
-
-## Evidencia y límites de la emulación
-
-La ejecución compartida de Fedora WSL del 8 de octubre de 2026 confirma el aprovisionamiento, ambas migraciones, la recuperación de los nodos anteriores de k3s, el rollout de los dos servicios y la disponibilidad de ambos NodePorts. Se precargan tres pagos aceptados y `eks-deploy` termina con código `0`. La salida completa de `smoke.sh` confirma registro, idempotencia, rechazo por límite, liquidación, balance contable, auditoría MSK, identidad de los dos roles y proxy API Gateway. **El despliegue EKS y el smoke de la versión corregida ya están comprobados.**
-
-Se comprueba también la versión corregida del aprovisionador mediante **74 pruebas de infraestructura aprobadas**, incluyendo el reconocimiento de imágenes k3s registradas por Docker como ID SHA-256. Se aprueban Ruff, ShellCheck, compilación Python y la validación Compose de los modos EKS, completo y host. Las pruebas de recuperación utilizan operaciones Docker/Kubernetes simuladas; cuatro pruebas del puente utilizan socat y backends HTTP reales. Se distinguen estas pruebas locales del despliegue real confirmado en Fedora WSL.
-
-Se recompila el reactor con la corrección de la prueba PostgreSQL usando JDK 25.0.4.1 y Maven 3.10.0: se obtiene `BUILD SUCCESS`, Spotless y **30 pruebas aprobadas: 19 de dominio, 3 de configuración de conexiones y 8 de diagnóstico TLS**. Hikari y el parser de pgJDBC son reales en las pruebas de configuración y diagnóstico, pero las conexiones se simulan; esas pruebas no sustituyen la conexión física a Aurora.
-
-La primera ejecución compartida de `scripts/test.sh all` alcanza PostgreSQL 18.6 con Testcontainers y aplica la migración, pero se detiene al comparar la fecha de un pago con precisión de nanosegundos contra su representación persistida en microsegundos. Se corrige `PostgresAdaptersTest` con una fecha reproducible de nanosegundos: se comprueban todos los demás campos, el redondeo esperado, la igualdad exacta del replay con el pago persistido y los destinos `SNS` y `KAFKA`. Se comprueban adicionalmente cuatro contratos del driver pgJDBC 42.7.13, incluido el valor del log y el redondeo al segundo siguiente. Estos contratos ejercitan la conversión del driver sin conexión SQL; no se presentan como una nueva ejecución de Testcontainers. No se modifican código productivo, migraciones ni configuración de despliegue.
-
-**Queda por confirmar en la infraestructura activa la ejecución completa de `scripts/test.sh all`: las 4 pruebas PostgreSQL con Testcontainers, las 8 pruebas AWS SDK y el verificador directo de roles, aislamiento SQL, transporte TLS y firmas KMS.** La salida del smoke comprueba el `sslMode` de la conexión JDBC y muestra `backendTls` por separado. El verificador adicional establece conexiones físicas con libpq, exige `verify-full` y comprueba el TLS del cliente; se admite `backendTls: false` porque el proxy de Floci termina el cifrado antes del motor. No se dispone de daemon Docker en el entorno de revisión para repetir esta ejecución completa.
-
-Se combinan entrega al menos una vez, outbox, inbox e identificadores estables. Una caída entre publicación y confirmación puede repetir un evento Kafka; la auditoría lo deduplica por `eventId`. SNS FIFO limita la deduplicación a su ventana temporal. S3 conserva versiones repetidas del mismo comprobante. No se promete una transacción distribuida ni entrega exactamente una vez entre sistemas.
-
-Floci no reproduce la red VPC ni la durabilidad/alta disponibilidad de AWS. Se utiliza Kafka PLAINTEXT y Redis sin autenticación dentro de la red local. PostgreSQL 18.6 se ejecuta como motor de Aurora emulado; esta selección no implica que AWS Aurora publique la misma versión. MSK utiliza el motor Redpanda administrado por Floci y no prueba la autenticación IAM de brokers AWS.
-
-Se conservan políticas con recursos concretos y tres concesiones locales necesarias en Floci 2.1.0: `monitoring:PutMetricData` por el prefijo de su protocolo CloudWatch, `sns:Publish` sobre los topics de la cuenta/región por su resolución JSON y `kms:Sign` sobre las claves de la cuenta/región porque el emulador evalúa `key/*`. Estas concesiones permiten probar los clientes reales, pero limitan la granularidad demostrable de SNS/KMS. Se retiran al adaptar las políticas a AWS; se conserva entonces únicamente el topic y la clave concreta. La denegación entre roles para DynamoDB/SSM y el sujeto OIDC se verifica mediante pruebas.
 
 ## Operación
 
@@ -469,100 +491,3 @@ No se habilita access logging de sondas HTTP ni se imprime el health check de fo
 docker compose -f infrastructura/compose.yml logs bootstrap
 docker compose -f infrastructura/compose.yml logs payment settlement
 ```
-
-Ante un error TLS se comprueban CA, volumen de Floci y hostname del datasource; se mantiene `verify-full`. Si no resuelve Kafka en el host se reaplica `sudo bash scripts/host-dns.sh` y se comprueba que `/etc/hosts` no conserve una IP anterior. En EKS se reaplica el despliegue para actualizar `hostAliases`.
-
-Un mensaje aislado `the database system is starting up` puede producirse cuando el emulador intenta conectarse mientras PostgreSQL todavía se inicia. Se comprueba que después se validen las migraciones y termine el bootstrap con código 0. Si el mensaje persiste o falla la espera de disponibilidad, se inspecciona el motor antes de continuar. Las entradas `/error` impresas al final son rutas del manejador de errores de Spring Boot; forman parte del catálogo de endpoints. La salida con código 0 de las tareas de construcción, bootstrap y despliegue indica que se completaron esas tareas.
-
-Si el rollout termina con `timed out waiting for the condition` y aparecen pods de nodos anteriores o eventos `NodeNotReady`, se actualiza `eks.py`, se reconstruye la imagen de herramientas y se repite el comando EKS con `--build`, conservando `.env`, `.runtime/` y los volúmenes. Se ejecuta la recuperación del nodo antes de aplicar el despliegue. Si el nodo actual no alcanza `Ready`, los nuevos diagnósticos incluyen sus condiciones, taints y logs de k3s; se inspecciona ese fallo antes de repetir la precarga. Un estado `Running 2/2` almacenado para un nodo desaparecido no confirma que los procesos sigan disponibles.
-
-Si curl devuelve `Failed to connect to localhost port 30080` o `30081` después de completar el rollout, se comprueba `eks-access` con el comando `ps` del modo EKS. Los NodePorts no se publicaban en el host en versiones anteriores. Se actualizan `compose.eks.yml`, `Dockerfile.tools` y `eks-access.sh` y se repite `up --build` con los dos archivos Compose. Se conservan `.env`, `.runtime/` y los volúmenes. Se consultan los logs del puente y la disponibilidad de ambos servicios:
-
-```bash
-docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks logs eks-access
-curl -fsS http://localhost:30080/actuator/health/readiness
-curl -fsS http://localhost:30081/actuator/health/readiness
-```
-
-Si el smoke anterior termina al exigir `database.tls is True`, se actualizan el módulo `platform`, `smoke.sh`, `check_identity.py` y `verify_aws.py`, y se reconstruye con `up --build`. El campo ambiguo `tls` se sustituye por `sslMode` y `backendTls`. Se comprueba el endpoint interno con la clave generada; `sslMode` debe ser `verify-full`, y `backendTls: false` es compatible con la terminación TLS de Floci. Se conserva la CA y no se debilita el modo SSL. El mensaje de arranque de Floci `TLS: disabled (HTTP only)` describe su API HTTP; el proxy RDS utiliza su configuración TLS independiente.
-
-Las advertencias Maven 401 de `flyway-community-db-support` y `MavenFeed` proceden de consultas de metadatos a feeds de terceros; no representan un rechazo de las credenciales IAM. El bootstrap utiliza el plugin Flyway del POM en modo offline para evitarlas. Si faltan artefactos en una imagen anterior, se reconstruye con `up --build` para preparar nuevamente su caché.
-
-Si `PostgresAdaptersTest.paymentAndBothDestinationsArePersistedOnce` falla con dos objetos `Payment` que sólo difieren en los últimos dígitos de `createdAt`, se comprueba la precisión de la fecha. Java puede representar nanosegundos; [PostgreSQL 18 conserva microsegundos](https://www.postgresql.org/docs/18/datatype-datetime.html) y pgJDBC redondea antes de transmitir el timestamp. Se reemplaza la prueba por la versión corregida y se repite `scripts/test.sh all`; no se requiere reconstruir imágenes ni volver a desplegar EKS para este cambio de pruebas.
-
-Los mensajes de purga o generación automática de un secreto HTTP de `registry:2` pertenecen al motor ECR de Floci. Este registro se mantiene deshabilitado porque el despliegue usa imágenes locales. Los contenedores o volúmenes retenidos de ejecuciones anteriores se conservan; no se aplica una limpieza global para eliminar esos mensajes. Al restaurar un motor, su stream de logs puede incluir entradas anteriores a la ejecución actual; se compara la fecha interna del mensaje con la hora del nuevo arranque.
-
-Ante un rechazo STS se comprueban el renovador, audiencia, sujeto y rol. Si una proyección todavía no existe se inspeccionan outbox, backlog y consumidores antes de repetir el registro. Se mantienen las claves de idempotencia para recuperar operaciones existentes.
-
-Si Flyway confirma las migraciones y los logs muestran `relation "payments" does not exist`, `relation "outbox" does not exist` o `relation "receipt_outbox" does not exist`, se comprueba el esquema desde `/internal/platform` con la clave interna. Floci 2.1.0 no transmite `currentSchema` del mensaje inicial del driver; se utiliza la selección de esquema de Hikari después de autenticar. Se actualiza `DatabaseConfiguration` y se reconstruyen las aplicaciones con `up --build`. Se conservan `.env`, `.runtime/` y los volúmenes; no se repiten ni modifican las migraciones para resolver este fallo.
-
-Si `eks-deploy` termina con `No help topic for 'ctr'`, se actualiza `eks.py` y se reconstruye la imagen de herramientas con `up --build`. En la imagen k3s seleccionada se utilizan directamente `/bin/ctr` y `/bin/kubectl`, en lugar de sus invocaciones como subcomandos de `k3s`. Se especifican el socket `/run/k3s/containerd/containerd.sock`, el namespace `k8s.io` y el kubeconfig `/etc/rancher/k3s/k3s.yaml`. Se importa mediante el modo local de containerd y se comprueba la referencia antes de aplicar los pods con `imagePullPolicy: Never`.
-
-Si una versión anterior termina con código 127 al ejecutar `mvnw` en `Dockerfile.base`, se actualizan el Dockerfile y el wrapper y se repite `up --build`: se instalan las herramientas de descarga antes de preparar Maven. Un mensaje `pull access denied` para `axiz-tools` indica que se está utilizando la configuración anterior; se actualizan los archivos Compose con la política de imágenes locales. Se conservan `.env`, `.runtime/` y los volúmenes al reemplazar los archivos del proyecto.
-
-Durante la primera ejecución, Floci descarga y arranca los motores dentro de solicitudes del plano de control. Un timeout corto seguido de un reintento puede duplicar `CreateCluster` o `CreateDBCluster` mientras la primera solicitud sigue activa. Se mantiene un timeout amplio y se desactivan las repeticiones automáticas del SDK del aprovisionador. Ante una respuesta perdida o un recurso ya existente, `ensure` consulta su estado sin reenviar la creación; `wait` limita la espera y propaga los errores de permisos. Se recuperan los metadatos actuales de Aurora después de alcanzar `available`.
-
-Redis se aprovisiona con `CreateReplicationGroup` y se descubre con `DescribeReplicationGroups`. Se utiliza un nodo primario, sin réplicas ni failover, para comprobar la caché con un solo motor. En Floci 2.1.0, `CreateCacheCluster` se reserva para Memcached; una solicitud con `Engine=redis` devuelve `InvalidParameterValue`. Se conserva la reconciliación por lectura si el grupo ya existe o se pierde la respuesta.
-
-Floci 2.1.0 elimina el contenedor MSK durante su cierre y conserva los metadatos y el volumen, pero no restaura ese motor al reiniciar. El aprovisionador compensa esta limitación local: se inicia el contenedor detenido o se recrea exclusivamente el contenedor eliminado usando su volumen retenido y la imagen Redpanda configurada en Floci. Se verifica la identidad de cuenta, región, recurso y volumen, y se espera `/v1/status/ready`. Si el volumen no existe, se aborta la recuperación para evitar un Kafka vacío. Se conserva el ARN y se lee el estado del emulador desde el montaje de sólo lectura; no se elimina ni se vuelve a crear el recurso AWS.
-
-Si MSK conserva un contenedor detenido después de eliminar y recrear `axiz-network`, se comparan el ID de la red conectada y `HostConfig.NetworkMode` con la red vigente. La búsqueda inicial utiliza las etiquetas del recurso, cuenta y región para localizar también contenedores asociados a una red eliminada. Ante una identidad de red anterior, se valida primero el volumen original y la configuración de Floci; se retira únicamente ese contenedor detenido mediante su ID, sin forzar su eliminación ni eliminar volúmenes, y se recrea en la red vigente. Si el contenedor se inicia durante esta operación, Docker rechaza su retirada y se conserva para diagnóstico. Se actualizan los archivos del proyecto y se repite el comando EKS con `--build`, conservando `.env`, `.runtime/` y los volúmenes.
-
-Si `docker start` falla por otro motivo, se informa el texto devuelto por el daemon y se conserva el contenedor. Se consultan su estado, configuración de red y logs antes de continuar:
-
-```bash
-docker inspect floci-msk-dfda92 --format '{{json .State}}'
-docker inspect floci-msk-dfda92 --format '{{json .NetworkSettings.Networks}}'
-docker network inspect axiz-network --format '{{.Id}}'
-docker logs --tail 100 floci-msk-dfda92
-```
-
-Se sustituye `floci-msk-dfda92` por el nombre concreto informado durante la recuperación.
-
-Tras recuperar el motor, el endpoint del plano de control puede conservar una IP anterior. Se utiliza el nombre DNS del contenedor verificado para las aplicaciones y los `hostAliases` EKS. Se repite `up --build` después de actualizar los archivos del proyecto, conservando `.env`, `.runtime/` y los volúmenes. La recuperación pertenece al laboratorio Floci; no se utiliza esta operación Docker contra AWS MSK. El contenedor recuperado puede permanecer activo después de detener Compose y sus logs se consultan directamente con `docker logs <nombre-del-broker>`; no se reconecta automáticamente su stream interno de logs a CloudWatch.
-
-Si una ejecución anterior termina con `DBClusterAlreadyExistsFault` o un conflicto de nombre de k3s, se actualizan los archivos del proyecto y se repite el comando EKS con `--build`. Se reconstruye la imagen de herramientas con el aprovisionador corregido y se reutilizan los recursos existentes. Se conserva el cluster EKS si ya se encuentra en `ACTIVE`; un estado `FAILED` requiere revisar los logs del motor antes de continuar.
-
-Se interrumpen procesos de primer plano con Ctrl+C y se detiene Compose:
-
-```bash
-docker compose -f infrastructura/compose.yml --profile full --profile eks down
-```
-
-Para detener el modo EKS se incluyen ambos archivos, de modo que se retire también el puente de acceso:
-
-```bash
-docker compose -f infrastructura/compose.yml -f infrastructura/compose.eks.yml --profile eks down
-```
-
-Los motores auxiliares se crean desde Floci y pueden permanecer fuera del conjunto de servicios de Compose. No se elimina globalmente ningún contenedor ni volumen desde los scripts.
-
-## Referencias técnicas
-
-- [Floci 2.1.0](https://github.com/floci-io/floci/tree/2.1.0).
-- [Aurora/RDS emulados](https://github.com/floci-io/floci/blob/2.1.0/docs/services/rds.md).
-- [Terminación TLS en el proxy RDS de Floci](https://floci.io/floci/services/rds/#tls-ssl).
-- [SSL y verificación de hostname en pgJDBC](https://jdbc.postgresql.org/documentation/ssl/).
-- [Alcance de pg_stat_ssl](https://www.postgresql.org/docs/18/monitoring-stats.html#MONITORING-PG-STAT-SSL-VIEW).
-- [TLS del cliente libpq](https://www.postgresql.org/docs/18/libpq-status.html#LIBPQ-PQSSLINUSE).
-- [Protocolo del proxy PostgreSQL de Floci 2.1.0](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/rds/proxy/PostgresProtocolHandler.java).
-- [EKS y emisión OIDC](https://github.com/floci-io/floci/blob/2.1.0/docs/services/eks.md).
-- [Publicación de la API Kubernetes en Floci](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/eks/EksClusterManager.java).
-- [Transporte TCP con socat](https://www.dest-unreach.org/socat/doc/socat.html).
-- [Importación de imágenes en k3s](https://docs.k3s.io/add-ons/import-images).
-- [Configuración del registro ECR en Floci](https://github.com/floci-io/floci/blob/2.1.0/docs/configuration/environment-variables.md).
-- [Resolución de prefijos de plugins Maven](https://maven.apache.org/guides/introduction/introduction-to-plugin-prefix-mapping.html).
-- [MSK emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/msk.md).
-- [Ciclo de vida y persistencia MSK en Floci 2.1.0](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/msk/MskService.java).
-- [Arranque y almacenamiento Redpanda en Floci 2.1.0](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/msk/RedpandaManager.java).
-- [Inspección de redes Docker](https://docs.docker.com/reference/cli/docker/network/inspect/).
-- [Eliminación de contenedores y conservación de volúmenes](https://docs.docker.com/reference/cli/docker/container/rm/).
-- [ElastiCache emulado](https://github.com/floci-io/floci/blob/2.1.0/docs/services/elasticache.md).
-- [Grupos de replicación Redis/Valkey](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_CreateReplicationGroup.html).
-- [Resolución de recursos IAM de Floci](https://github.com/floci-io/floci/blob/2.1.0/src/main/java/io/github/hectorvent/floci/services/iam/ResourceArnBuilder.java).
-- [Requisitos de Spring Boot](https://docs.spring.io/spring-boot/system-requirements.html).
-- [Construcción de imágenes y dependencias en Compose](https://docs.docker.com/reference/compose-file/build/).
-- [Política de descarga de imágenes locales en Compose](https://docs.docker.com/reference/compose-file/services/#pull_policy).
-- [Timeouts e intentos totales de botocore](https://docs.aws.amazon.com/botocore/latest/reference/config.html).
-- [Autenticación IAM de Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.IAMDBAuth.html).
-- [Roles por ServiceAccount en EKS](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html).

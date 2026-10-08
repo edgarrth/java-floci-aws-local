@@ -1,6 +1,0 @@
-Se comprobó OIDC firmado, STS y rechazo de otro ServiceAccount.
-Se comprobó SSM, Secrets Manager y CloudWatch con el rol de pagos.
-Se comprobó SNS FIFO, SQS y confirmación mediante los roles de aplicación.
-Se comprobó firma KMS y persistencia S3 con el rol de liquidación.
-Se comprobó API Gateway HTTP proxy, parámetros y cabeceras con un backend de prueba.
-La validación de protocolo no ejecuta motores PostgreSQL, Redis, MSK ni pods EKS.

@@ -1,6 +1,0 @@
-maven.tar.gz: OK
-Apache Maven 3.10.0 (c43a36b8d67be7e0805a411bc0898af1a51f5472)
-Maven home: /workspace/scratch/e9eb687a9e66/.validation-tools/wrapper-first-run/apache-maven-3.10.0
-Java version: 25.0.4.1, vendor: Eclipse Adoptium, runtime: /workspace/scratch/e9eb687a9e66/.validation-tools/jdk25
-Default locale: en, platform encoding: UTF-8, time zone: Pacific/Auckland
-OS name: "linux", version: "6.18.44", arch: "amd64", family: "unix"

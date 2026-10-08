@@ -1,3 +1,0 @@
-Se comprobó DELETE con UID uid-retirado: salida 0.
-Se comprobó DELETE con UID uid-sustituido: salida 1.
-Se utiliza kubectl 1.35.9 oficial con checksum verificado contra una API HTTP local. Se confirma el envío del cuerpo DeleteOptions y el rechazo HTTP 409 de un UID sustituido. No se ejecuta el controlador PodGC ni un clúster físico.
