@@ -26,7 +26,6 @@ public class DatabaseConfiguration {
     pg.setDatabaseName(env.getRequiredProperty("axiz.database.name"));
     pg.setSslMode("verify-full");
     pg.setSslRootCert(env.getRequiredProperty("axiz.database.ca"));
-    pg.setCurrentSchema(env.getRequiredProperty("axiz.database.schema"));
     pg.setConnectTimeout(5);
     pg.setSocketTimeout(10);
     var rds =
@@ -36,6 +35,8 @@ public class DatabaseConfiguration {
             .build();
     var hc = new HikariConfig();
     hc.setDataSource(new IamDataSource(pg, rds, host, port, user));
+    // Se selecciona el esquema después de autenticar; el proxy no transmite opciones de inicio.
+    hc.setSchema(env.getRequiredProperty("axiz.database.schema"));
     hc.setMaximumPoolSize(8);
     hc.setMinimumIdle(1);
     hc.setConnectionTimeout(6000);

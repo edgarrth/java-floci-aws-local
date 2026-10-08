@@ -41,3 +41,27 @@ services:
         condition: service_completed_successfully
       settlement-image:
         condition: service_completed_successfully
+  eks-access:
+    image: axiz-tools:2.0.0
+    pull_policy: never
+    profiles: [eks]
+    depends_on:
+      eks-deploy:
+        condition: service_completed_successfully
+    command: ["bash", "infrastructura/eks-access.sh"]
+    ports:
+      - "127.0.0.1:30080:30080"
+      - "127.0.0.1:30081:30081"
+    networks: [axiz]
+    init: true
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --max-time 3 http://127.0.0.1:30080/actuator/health/readiness >/dev/null 2>&1 && curl -fsS --max-time 3 http://127.0.0.1:30081/actuator/health/readiness >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 8s
+      retries: 6
+      start_period: 10s

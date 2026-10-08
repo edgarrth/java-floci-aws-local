@@ -1,0 +1,18 @@
+[INFO] Scanning for projects...
+[INFO] Loaded 24029 auto-discovered prefixes for remote repository central (prefixes-central.txt)
+[INFO] Loaded 24029 auto-discovered prefixes for remote repository maven-central (prefixes-maven-central.txt)
+[INFO] 
+[INFO] -----------------------< pe.axiz:floci-payments >-----------------------
+[INFO] Building Axiz Floci Payments 2.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- flyway:12.4.0:migrate (default-cli) @ floci-payments ---
+[INFO] Loaded 74 auto-discovered prefixes for remote repository apache.snapshots (prefixes-apache.snapshots.txt)
+[INFO] Skipping Flyway execution
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  0.680 s
+[INFO] Finished at: 2026-10-08T20:50:57+02:00
+[INFO] ------------------------------------------------------------------------

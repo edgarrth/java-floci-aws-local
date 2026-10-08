@@ -7,10 +7,15 @@ import pathlib
 import time
 import uuid
 
-import bootstrap
 import boto3
 import psycopg
 from botocore.exceptions import ClientError
+from psycopg import sql
+
+if __package__:
+    from . import bootstrap
+else:
+    import bootstrap
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ROLE_PREFIX = "arn:aws:iam::000000000000:role/axiz-"
@@ -59,6 +64,42 @@ def wait_receipt(payment_id):
     raise TimeoutError("No se publicó el comprobante " + payment_id)
 
 
+def verify_database(service, credentials, resources):
+    host = "floci" if bootstrap.ENDPOINT.startswith("http://floci") else "localhost"
+    username = "axiz_" + service
+    password = scoped("rds", credentials).generate_db_auth_token(
+        DBHostname=host, Port=resources["dbPort"], DBUsername=username
+    )
+    with psycopg.connect(
+        host=host,
+        port=resources["dbPort"],
+        dbname="axiz",
+        user=username,
+        password=password,
+        sslmode="verify-full",
+        sslrootcert=str(ROOT / ".runtime/rds-ca.crt"),
+        connect_timeout=5,
+    ) as connection:
+        # Se mide TLS en el cliente libpq; el proxy termina el cifrado antes del motor.
+        assert connection.pgconn.ssl_in_use, "La conexión del cliente no utiliza TLS"
+        with connection.cursor() as cursor:
+            # Se selecciona el esquema después del login IAM, igual que en el datasource Java.
+            cursor.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(service)))
+            cursor.execute(
+                "SELECT current_user,current_schema(),"
+                "(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid())"
+            )
+            result = cursor.fetchone()
+            assert result is not None and result[:2] == (username, service), result
+            other = "settlement.inbox" if service == "payment" else "payment.payments"
+            try:
+                cursor.execute("SELECT 1 FROM " + other)
+            except psycopg.errors.InsufficientPrivilege:
+                connection.rollback()
+            else:
+                raise AssertionError("Se permitió leer el esquema de otro servicio")
+
+
 def verify():
     payment, settlement = assume("payment"), assume("settlement")
     for service, credentials in [("payment", payment), ("settlement", settlement)]:
@@ -77,36 +118,8 @@ def verify():
     print("Se comprobó identidad web, sujeto de ServiceAccount y separación de permisos AWS.")
 
     resources = json.loads((ROOT / ".runtime/resources.json").read_text())
-    host = "floci" if bootstrap.ENDPOINT.startswith("http://floci") else "localhost"
     for service, credentials in [("payment", payment), ("settlement", settlement)]:
-        username = "axiz_" + service
-        password = scoped("rds", credentials).generate_db_auth_token(
-            DBHostname=host, Port=resources["dbPort"], DBUsername=username
-        )
-        with psycopg.connect(
-            host=host,
-            port=resources["dbPort"],
-            dbname="axiz",
-            user=username,
-            password=password,
-            sslmode="verify-full",
-            sslrootcert=str(ROOT / ".runtime/rds-ca.crt"),
-            connect_timeout=5,
-            options="-c search_path=" + service,
-        ) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT current_user,current_schema(),ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()"
-                )
-                result = cursor.fetchone()
-                assert result == (username, service, True), result
-                other = "settlement.inbox" if service == "payment" else "payment.payments"
-                try:
-                    cursor.execute("SELECT 1 FROM " + other)
-                except psycopg.errors.InsufficientPrivilege:
-                    connection.rollback()
-                else:
-                    raise AssertionError("Se permitió leer el esquema de otro servicio")
+        verify_database(service, credentials, resources)
     print("Se comprobó Aurora con token IAM, TLS y separación de esquemas PostgreSQL.")
 
     sns, sqs = bootstrap.client("sns"), bootstrap.client("sqs")

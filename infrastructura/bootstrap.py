@@ -488,7 +488,7 @@ def database():
             FLYWAY_LOCATIONS=f"filesystem:/workspace/{service}-service/src/main/resources/db/migration",
         )
         subprocess.run(
-            ["./mvnw", "-B", "-ntp", "-N", "flyway:migrate"],
+            ["./mvnw", "-o", "-B", "-ntp", "-N", "org.flywaydb:flyway-maven-plugin:migrate"],
             check=True,
             env=env,
             cwd=ROOT,
@@ -672,7 +672,9 @@ def restore_msk_runtime(cluster_arn, api_brokers=None):
     filters = msk_filters(cluster_arn)
     command = ["docker", "ps", "--all", "--format", "{{.ID}}"]
     for key, value in filters.items():
-        command.extend(["--filter", key + "=" + value])
+        # Se localizan también contenedores detenidos que retienen una red eliminada.
+        if key != "network":
+            command.extend(["--filter", key + "=" + value])
     identifiers = subprocess.run(
         command, check=True, capture_output=True, text=True
     ).stdout.splitlines()
@@ -685,6 +687,9 @@ def restore_msk_runtime(cluster_arn, api_brokers=None):
             ).stdout
         )[0]
         if container["State"]["Running"]:
+            networks = container.get("NetworkSettings", {}).get("Networks", {})
+            if "axiz-network" not in networks:
+                raise RuntimeError("El broker MSK activo no pertenece a la red axiz-network")
             labels = container["Config"].get("Labels") or {}
             name = container["Name"].removeprefix("/")
             if labels.get("pe.axiz.msk-recovered") == "true":
@@ -728,6 +733,7 @@ def restore_msk_runtime(cluster_arn, api_brokers=None):
     subprocess.run(
         ["docker", "volume", "inspect", name], check=True, capture_output=True, text=True
     )
+    creation = None
     if container:
         mounts = container.get("Mounts", [])
         if container["Name"] != "/" + name or not any(
@@ -737,63 +743,98 @@ def restore_msk_runtime(cluster_arn, api_brokers=None):
             for m in mounts
         ):
             raise RuntimeError("El contenedor MSK detenido no utiliza el volumen original")
-    else:
-        emulator = json.loads(
-            subprocess.run(
-                ["docker", "inspect", "axiz-floci"], check=True, capture_output=True, text=True
-            ).stdout
-        )[0]
-        if emulator["Config"]["Image"] != "floci/floci:2.1.0":
-            raise RuntimeError("La recuperación del motor MSK está validada para Floci 2.1.0")
-        env = dict(value.split("=", 1) for value in emulator["Config"]["Env"] if "=" in value)
-        image = env.get("FLOCI_SERVICES_MSK_DEFAULT_IMAGE")
-        if not image:
-            raise RuntimeError("Floci no declara la imagen Redpanda necesaria para recuperar MSK")
-        command = [
-            "docker",
-            "create",
-            "--name",
-            name,
-            "--network",
-            "axiz-network",
-            "--mount",
-            "type=volume,src=" + name + ",dst=/var/lib/redpanda/data,volume-nocopy",
-            "--log-opt",
-            "max-size=10m",
-            "--log-opt",
-            "max-file=3",
-            "--label",
-            "floci=true",
-            "--label",
-            "floci_emulator=floci-aws",
-            "--label",
-            "pe.axiz.msk-recovered=true",
-        ]
-        for key, value in filters.items():
-            if key.startswith("label="):
-                command.extend(["--label", key.removeprefix("label=") + "=" + value])
-        command.extend(
-            [
-                image,
-                "redpanda",
-                "start",
-                "--overprovisioned",
-                "--smp",
-                "1",
-                "--memory",
-                "512M",
-                "--reserve-memory",
-                "0M",
-                "--advertise-kafka-addr",
-                name + ":9092",
-            ]
-        )
-        subprocess.run(command, check=True, capture_output=True, text=True)
+        if not container["State"]["Running"]:
+            current = json.loads(
+                run_msk_command(["docker", "network", "inspect", "axiz-network"]).stdout
+            )[0]
+            if current.get("Name") != "axiz-network" or not current.get("Id"):
+                raise RuntimeError("No se pudo verificar la identidad de la red axiz-network")
+            attached = (
+                container.get("NetworkSettings", {}).get("Networks", {}).get("axiz-network", {})
+            )
+            mode = container.get("HostConfig", {}).get("NetworkMode")
+            if attached.get("NetworkID") != current["Id"] or mode not in {
+                "axiz-network",
+                current["Id"],
+            }:
+                # Se valida la configuración antes de retirar únicamente el contenedor detenido.
+                creation = msk_creation_command(name, filters)
+                print(
+                    "Se recrea el contenedor MSK asociado a una red anterior: " + name, flush=True
+                )
+                run_msk_command(["docker", "rm", container["Id"]])
+                container = None
+    if not container:
+        run_msk_command(creation or msk_creation_command(name, filters))
     print("Se recupera el broker MSK con su volumen retenido: " + name, flush=True)
     if not container or not container["State"]["Running"]:
-        subprocess.run(["docker", "start", name], check=True, capture_output=True, text=True)
+        run_msk_command(["docker", "start", name])
     wait_msk_ready(name)
     return name
+
+
+def run_msk_command(command):
+    """Se conserva el diagnóstico del daemon cuando falla una operación del motor MSK."""
+    try:
+        return subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or "Docker no devolvió un diagnóstico").strip()
+        raise RuntimeError("No se pudo ejecutar " + " ".join(command) + ": " + detail) from error
+
+
+def msk_creation_command(name, filters):
+    """Se prepara el contenedor con la imagen configurada y el volumen retenido de MSK."""
+    emulator = json.loads(
+        subprocess.run(
+            ["docker", "inspect", "axiz-floci"], check=True, capture_output=True, text=True
+        ).stdout
+    )[0]
+    if emulator["Config"]["Image"] != "floci/floci:2.1.0":
+        raise RuntimeError("La recuperación del motor MSK está validada para Floci 2.1.0")
+    env = dict(value.split("=", 1) for value in emulator["Config"]["Env"] if "=" in value)
+    image = env.get("FLOCI_SERVICES_MSK_DEFAULT_IMAGE")
+    if not image:
+        raise RuntimeError("Floci no declara la imagen Redpanda necesaria para recuperar MSK")
+    command = [
+        "docker",
+        "create",
+        "--name",
+        name,
+        "--network",
+        "axiz-network",
+        "--mount",
+        "type=volume,src=" + name + ",dst=/var/lib/redpanda/data,volume-nocopy",
+        "--log-opt",
+        "max-size=10m",
+        "--log-opt",
+        "max-file=3",
+        "--label",
+        "floci=true",
+        "--label",
+        "floci_emulator=floci-aws",
+        "--label",
+        "pe.axiz.msk-recovered=true",
+    ]
+    for key, value in filters.items():
+        if key.startswith("label="):
+            command.extend(["--label", key.removeprefix("label=") + "=" + value])
+    command.extend(
+        [
+            image,
+            "redpanda",
+            "start",
+            "--overprovisioned",
+            "--smp",
+            "1",
+            "--memory",
+            "512M",
+            "--reserve-memory",
+            "0M",
+            "--advertise-kafka-addr",
+            name + ":9092",
+        ]
+    )
+    return command
 
 
 def wait_msk_ready(name):

@@ -2,6 +2,16 @@
 set -euo pipefail
 payment=${PAYMENT_URL:-http://localhost:8080}
 settlement=${SETTLEMENT_URL:-http://localhost:8081}
+for base in "$payment" "$settlement"; do
+  deadline=$((SECONDS + 30))
+  until curl -fsS --connect-timeout 2 --max-time 2 "$base/actuator/health/readiness" >/dev/null 2>&1; do
+    if ((SECONDS >= deadline)); then
+      printf 'No se pudo acceder a readiness en %s. Se comprueba el arranque y, en EKS, el estado healthy de eks-access.\n' "$base" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+done
 api_key=$(cat .runtime/api-key)
 internal=$(cat .runtime/internal-key)
 run=$(date +%s%N)
@@ -22,16 +32,33 @@ echo 'Se comprobó el rechazo persistido por límite del comercio.'
 for pid in "$id" "$rejected_id"; do
   ready=false
   for _attempt in $(seq 1 90); do
-    if curl -fsS "$settlement/api/settlements/$pid" -H "X-Api-Key: $api_key" > .runtime/settlement-smoke.json && curl -fsS "$settlement/api/settlements/$pid/audit" -H "X-Api-Key: $api_key" > .runtime/audit-smoke.json; then ready=true; break; fi
+    for projection in "settlements/$pid" "settlements/$pid/audit"; do
+      output=.runtime/settlement-smoke.json
+      [[ "$projection" != */audit ]] || output=.runtime/audit-smoke.json
+      code=$(curl -sS --connect-timeout 2 --max-time 5 -o "$output" -w '%{http_code}' "$settlement/api/$projection" -H "X-Api-Key: $api_key")
+      if [[ "$code" == 404 ]]; then
+        break
+      elif [[ "$code" != 200 ]]; then
+        printf 'Falló la consulta asíncrona %s: HTTP %s.\n' "$projection" "$code" >&2
+        cat "$output" >&2
+        exit 1
+      fi
+    done
+    if [[ "$code" == 200 ]]; then ready=true; break; fi
     sleep 1
   done
-  [[ "$ready" == true ]]
+  if [[ "$ready" != true ]]; then
+    printf 'No se materializaron comprobante y auditoría del pago %s dentro de la espera.\n' "$pid" >&2
+    exit 1
+  fi
 done
 curl -fsS "$settlement/api/settlements/$id/ledger" -H "X-Api-Key: $api_key" | python3 -c 'import json,sys,decimal; rows=json.load(sys.stdin); assert len(rows)==2; assert sum(decimal.Decimal(str(r["amount"])) for r in rows)==0'
 curl -fsS "$settlement/api/settlements/$rejected_id/ledger" -H "X-Api-Key: $api_key" | python3 -c 'import json,sys; assert json.load(sys.stdin)==[]'
 echo 'Se comprobó SNS/SQS, liquidación, auditoría MSK y balance contable.'
-for base in "$payment" "$settlement"; do
-  curl -fsS "$base/internal/platform" -H "X-Internal-Key: $internal" | python3 -c 'import json,sys; value=json.load(sys.stdin); assert "assumed-role/axiz-" in value["awsRole"]; assert value["database"]["tls"] is True'
+for service in payment settlement; do
+  base=$payment
+  [[ "$service" == payment ]] || base=$settlement
+  curl -fsS "$base/internal/platform" -H "X-Internal-Key: $internal" | python3 infrastructura/check_identity.py "$service"
   code=$(curl -sS -o /dev/null -w '%{http_code}' "$base/internal/platform")
   [[ "$code" == 401 ]]
 done

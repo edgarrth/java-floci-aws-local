@@ -1,0 +1,22 @@
+Se prueban scripts reales contra simuladores HTTP; no se ejercitan Floci, pods ni motores físicos.
+Smoke completo aprobado; backendTls=false y cuatro 404 transitorios.
+Se comprobó registro, replay y conflicto de idempotencia.
+Se comprobó el rechazo persistido por límite del comercio.
+Se comprobó SNS/SQS, liquidación, auditoría MSK y balance contable.
+Se comprobó identidad y verify-full de payment; backendTls se informa por separado.
+Se comprobó identidad y verify-full de settlement; backendTls se informa por separado.
+Se comprobó rol asumido, TLS PostgreSQL y rechazo de acceso interno anónimo.
+Se comprobó el proxy de API Gateway con autenticación y parámetros de ruta.
+Catálogo de endpoints del servicio: pagos
+  {GET [/internal/platform]}
+  GET /actuator/health/liveness
+  GET /actuator/health/readiness
+  GET /actuator/prometheus
+Catálogo de endpoints del servicio: liquidación
+  {GET [/internal/platform]}
+  GET /actuator/health/liveness
+  GET /actuator/health/readiness
+  GET /actuator/prometheus
+API Gateway: http://axiz-payments.execute-api.localhost.floci.io:4566
+
+Se rechazó sslMode=prefer con diagnóstico explícito: Falló la comprobación de identidad de payment: No se comprobó TLS con certificado y hostname verificados

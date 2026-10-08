@@ -1,0 +1,26 @@
+{
+  "correccion": "Selección de esquema después de autenticar cada conexión IAM",
+  "fecha": "2026-10-07",
+  "causa": "El proxy de Floci 2.1.0 transmite usuario y base de datos, pero descarta las opciones de inicio que utiliza currentSchema del driver PostgreSQL.",
+  "cambio": "Se utiliza HikariConfig.setSchema para ejecutar JDBC Connection.setSchema después de la autenticación y restaurar el esquema al devolver la conexión.",
+  "pruebas_esquema": {
+    "aprobadas": 3,
+    "regresion_anterior": "Las tres pruebas fallan con la configuración anterior y pasan con la corrección.",
+    "alcance": "Hikari real, conexión JDBC simulada; se prueban ambas identidades de servicio y la reutilización."
+  },
+  "maven_verify": {
+    "aprobadas": 22,
+    "omitidas": 12,
+    "fallos": 0,
+    "compilacion": "aprobada",
+    "empaquetado": "aprobado",
+    "spotless": "aprobado"
+  },
+  "pruebas_infraestructura": {
+    "aprobadas": 31,
+    "fallos": 0,
+    "docker": "operaciones simuladas"
+  },
+  "java_25": "Se carga Mockito como agente explícito de pruebas en Surefire; se elimina la dependencia de la carga dinámica del agente.",
+  "limite": "No se dispone de un daemon Docker; queda pendiente el despliegue completo Compose/EKS con motores reales."
+}

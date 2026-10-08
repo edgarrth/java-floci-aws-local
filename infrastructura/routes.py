@@ -16,9 +16,10 @@ for index, base in enumerate(sys.argv[1:]):
             time.sleep(2)
     else:
         raise TimeoutError("No se pudo obtener el catálogo de " + base)
-    print("Servicio: " + ["pagos", "liquidación"][index])
+    print("Catálogo de endpoints del servicio: " + ["pagos", "liquidación"][index])
     for route in routes:
-        print("  " + route)
+        description = " (manejador de errores de Spring Boot)" if "[/error]" in route else ""
+        print("  " + route + description)
     print("  GET /actuator/health/liveness")
     print("  GET /actuator/health/readiness")
     print("  GET /actuator/prometheus")

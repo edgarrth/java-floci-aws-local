@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.core.env.Environment;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,10 +37,7 @@ public class PlatformIdentityController implements AutoCloseable {
   @GetMapping("/internal/platform")
   Object identity() {
     var identity = sts.getCallerIdentity();
-    var database =
-        jdbc.queryForMap(
-            "SELECT current_user AS username,current_schema() AS schema,"
-                + "(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()) AS tls");
+    var database = jdbc.execute((ConnectionCallback<DatabaseIdentity>) DatabaseIdentity::inspect);
     return Map.of("awsRole", identity.arn(), "account", identity.account(), "database", database);
   }
 

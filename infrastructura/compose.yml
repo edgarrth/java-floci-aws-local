@@ -64,6 +64,8 @@ services:
       FLOCI_SERVICES_MSK_DEFAULT_IMAGE: redpandadata/redpanda:v26.2.3
       FLOCI_SERVICES_EKS_DEFAULT_IMAGE: rancher/k3s:v1.35.9-k3s1
       FLOCI_SERVICES_EKS_MOCK: ${EKS_MOCK:-true}
+      # Se importan imágenes locales en k3s; el flujo no utiliza el registro ECR.
+      FLOCI_SERVICES_ECR_ENABLED: "false"
       FLOCI_SERVICES_IAM_ENFORCEMENT_ENABLED: "true"
       FLOCI_SERVICES_IAM_SEED_DEPLOYER_PRINCIPAL: "true"
       FLOCI_SERVICES_UI_ENABLED: "false"

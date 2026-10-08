@@ -1,0 +1,59 @@
+[INFO] Scanning for projects...
+[INFO] Loaded 24013 auto-discovered prefixes for remote repository central (prefixes-central.txt)
+[INFO] 
+[INFO] --------------------------< pe.axiz:platform >--------------------------
+[INFO] Building platform 2.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] Loaded 74 auto-discovered prefixes for remote repository apache.snapshots (prefixes-apache.snapshots.txt)
+[INFO] 
+[INFO] --- enforcer:3.6.3:enforce (default) @ platform ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] Rule 1: org.apache.maven.enforcer.rules.version.RequireMavenVersion passed
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ platform ---
+[INFO] skip non existing resourceDirectory /workspace/scratch/e9eb687a9e66/axiz-floci-payments/platform/src/main/resources
+[INFO] skip non existing resourceDirectory /workspace/scratch/e9eb687a9e66/axiz-floci-payments/platform/src/main/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ platform ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 11 source files with javac [debug parameters release 25] to target/classes
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ platform ---
+[INFO] skip non existing resourceDirectory /workspace/scratch/e9eb687a9e66/axiz-floci-payments/platform/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ platform ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 1 source file with javac [debug parameters release 25] to target/test-classes
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ platform ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running pe.axiz.platform.configuration.DatabaseConfigurationTest
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+18:23:35.432 [main] WARN com.zaxxer.hikari.HikariConfig -- payment-test-iam - idleTimeout is close to or more than maxLifetime, disabling it.
+18:23:35.440 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Starting...
+18:23:35.443 [main] INFO com.zaxxer.hikari.pool.PoolBase -- payment-test-iam - Failed to set login timeout for data source. (setLoginTimeout)
+18:23:35.487 [main] INFO com.zaxxer.hikari.pool.HikariPool -- payment-test-iam - Added connection Mock for Connection, hashCode: 1292325833
+18:23:35.491 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Start completed.
+18:23:35.575 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Shutdown initiated...
+18:23:35.578 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Shutdown completed.
+18:23:35.647 [main] WARN com.zaxxer.hikari.HikariConfig -- payment-test-iam - idleTimeout is close to or more than maxLifetime, disabling it.
+18:23:35.647 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Starting...
+18:23:35.647 [main] INFO com.zaxxer.hikari.pool.PoolBase -- payment-test-iam - Failed to set login timeout for data source. (setLoginTimeout)
+18:23:35.650 [main] INFO com.zaxxer.hikari.pool.HikariPool -- payment-test-iam - Added connection Mock for Connection, hashCode: 1726490536
+18:23:35.651 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Start completed.
+18:23:35.654 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Shutdown initiated...
+18:23:35.655 [main] WARN com.zaxxer.hikari.pool.HikariPool -- Timed-out waiting for add connection executor to shutdown
+18:23:35.656 [main] INFO com.zaxxer.hikari.HikariDataSource -- payment-test-iam - Shutdown completed.
+18:23:35.665 [main] WARN com.zaxxer.hikari.HikariConfig -- settlement-test-iam - idleTimeout is close to or more than maxLifetime, disabling it.
+18:23:35.665 [main] INFO com.zaxxer.hikari.HikariDataSource -- settlement-test-iam - Starting...
+18:23:35.665 [main] INFO com.zaxxer.hikari.pool.PoolBase -- settlement-test-iam - Failed to set login timeout for data source. (setLoginTimeout)
+18:23:35.669 [main] INFO com.zaxxer.hikari.pool.HikariPool -- settlement-test-iam - Added connection Mock for Connection, hashCode: 644783578
+18:23:35.669 [main] INFO com.zaxxer.hikari.HikariDataSource -- settlement-test-iam - Start completed.
+18:23:35.673 [main] INFO com.zaxxer.hikari.HikariDataSource -- settlement-test-iam - Shutdown initiated...
+18:23:35.674 [main] WARN com.zaxxer.hikari.pool.HikariPool -- Timed-out waiting for add connection executor to shutdown
+18:23:35.675 [main] INFO com.zaxxer.hikari.HikariDataSource -- settlement-test-iam - Shutdown completed.

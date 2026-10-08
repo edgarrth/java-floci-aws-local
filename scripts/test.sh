@@ -5,8 +5,8 @@ if [[ "${1:-unit}" == all ]]; then
 else
   ./mvnw -B -ntp verify
 fi
-python3 -m compileall -q infrastructura datasets
-for script in scripts/*.sh datasets/*.sh; do bash -n "$script"; done
+python3 -m compileall -q infrastructura datasets scripts
+for script in scripts/*.sh datasets/*.sh infrastructura/*.sh; do bash -n "$script"; done
 if [[ "${1:-unit}" == all ]]; then
   docker compose -f infrastructura/compose.yml run --rm --no-deps bootstrap python3 -m unittest discover -s infrastructura/tests -v
   bash scripts/smoke.sh
