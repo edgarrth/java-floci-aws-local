@@ -5,7 +5,11 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import subprocess
+import time
+import urllib.error
+import urllib.request
 
 import yaml
 
@@ -79,7 +83,284 @@ def ip(container):
     ).stdout.strip()
 
 
-def deploy():
+def runtime_inventory():
+    """Se inspeccionan también contenedores detenidos para conservar nodos recuperables."""
+    ids = docker(
+        "ps", "--all", "--quiet", "--no-trunc", capture_output=True, text=True
+    ).stdout.split()
+    if not ids:
+        raise RuntimeError("No se encontró el contenedor del clúster EKS local")
+    return json.loads(docker("inspect", *ids, capture_output=True, text=True).stdout)
+
+
+def k3s_image(image):
+    """Docker puede registrar la imagen del contenedor como ID; se resuelve por sus etiquetas."""
+    if image.startswith("rancher/k3s:"):
+        return True
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image):
+        return False
+    tags = json.loads(
+        docker(
+            "image",
+            "inspect",
+            image,
+            "--format",
+            "{{json .RepoTags}}",
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
+    return any(tag.startswith("rancher/k3s:") for tag in tags or [])
+
+
+def local_runtime(containers):
+    """Se verifica propiedad, identidad y volumen del único servidor k3s de esta PoC."""
+    matching = [c for c in containers if c.get("Name") == "/" + CLUSTER_CONTAINER]
+    if len(matching) != 1:
+        raise RuntimeError("No se identificó un único contenedor EKS local")
+    container = matching[0]
+    config = container.get("Config", {})
+    labels = config.get("Labels") or {}
+    expected = {
+        "io.floci.service": "eks",
+        "io.floci.resource-id": bootstrap.CLUSTER,
+        "io.floci.account": "000000000000",
+        "io.floci.region": bootstrap.REGION,
+    }
+    hostname = config.get("Hostname", "")
+    if (
+        not container.get("State", {}).get("Running")
+        or any(labels.get(key) != value for key, value in expected.items())
+        or not k3s_image(config.get("Image", ""))
+        or not re.fullmatch(r"[0-9a-f]{12}", hostname)
+        or not container.get("Id", "").startswith(hostname)
+        or any(value.startswith("K3S_NODE_NAME=") for value in config.get("Env") or [])
+        or any(value.startswith("--node-name") for value in config.get("Cmd") or [])
+        or not any(
+            mount.get("Type") == "volume"
+            and mount.get("Name") == CLUSTER_CONTAINER
+            and mount.get("Destination") == "/var/lib/rancher/k3s"
+            for mount in container.get("Mounts", [])
+        )
+    ):
+        raise RuntimeError("No se pudo verificar la identidad del runtime k3s de Floci")
+    return container
+
+
+def recover_local_nodes(seconds=120, interval=2):
+    """Se retiran registros de nodos Docker desaparecidos y se espera la limpieza PodGC."""
+    containers = runtime_inventory()
+    current = local_runtime(containers)
+    hostname = current["Config"]["Hostname"]
+    kube("wait", "--for=create", "node/" + hostname, "--timeout=60s", timeout=70)
+    kube("wait", "--for=condition=Ready", "node/" + hostname, "--timeout=180s", timeout=190)
+    nodes = json.loads(kube("get", "nodes", "-o", "json", capture_output=True, text=True).stdout)
+    actual = [n for n in nodes["items"] if n["metadata"]["name"] == hostname]
+    if len(actual) != 1 or actual[0].get("spec", {}).get("unschedulable"):
+        raise RuntimeError("El nodo k3s actual no está disponible para programar pods")
+    stale = [n for n in nodes["items"] if n["metadata"]["name"] != hostname]
+    for node in stale:
+        name = node["metadata"]["name"]
+        labels = node["metadata"].get("labels", {})
+        # Se admite sólo la identidad Docker que utiliza el proveedor local de un nodo.
+        if (
+            not re.fullmatch(r"[0-9a-f]{12}", name)
+            or labels.get("kubernetes.io/hostname") != name
+            or labels.get("node.kubernetes.io/instance-type") != "k3s"
+            or not node["metadata"].get("uid")
+        ):
+            raise RuntimeError("Se encontró un nodo ajeno al modelo local de Floci: " + name)
+        if any(
+            c.get("Config", {}).get("Hostname") == name or c.get("Id", "").startswith(name)
+            for c in containers
+        ):
+            raise RuntimeError("Se conserva el nodo con contenedor existente: " + name)
+    for node in stale:
+        name = node["metadata"]["name"]
+        fresh = runtime_inventory()
+        if local_runtime(fresh)["Id"] != current["Id"]:
+            raise RuntimeError("El runtime EKS cambió durante su recuperación")
+        if any(
+            c.get("Config", {}).get("Hostname") == name or c.get("Id", "").startswith(name)
+            for c in fresh
+        ):
+            raise RuntimeError("Se conserva el nodo con contenedor existente: " + name)
+        # Se protege la operación contra la sustitución del objeto desde la lectura.
+        options = {
+            "apiVersion": "v1",
+            "kind": "DeleteOptions",
+            "preconditions": {
+                "uid": node["metadata"]["uid"],
+            },
+        }
+        kube(
+            "delete",
+            "--raw=/api/v1/nodes/" + name,
+            "-f",
+            "-",
+            input=json.dumps(options).encode(),
+            timeout=15,
+        )
+        print("Se retiró el registro del nodo cuyo contenedor desapareció: " + name, flush=True)
+    if stale:
+        names = {node["metadata"]["name"] for node in stale}
+        deadline = time.monotonic() + seconds
+        while (remaining := deadline - time.monotonic()) > 0:
+            pods = json.loads(
+                kube(
+                    "get",
+                    "pods",
+                    "--all-namespaces",
+                    "-o",
+                    "json",
+                    "--request-timeout=5s",
+                    capture_output=True,
+                    text=True,
+                    timeout=min(7, remaining),
+                ).stdout
+            )
+            if not any(p.get("spec", {}).get("nodeName") in names for p in pods["items"]):
+                break
+            time.sleep(min(interval, max(0, deadline - time.monotonic())))
+        else:
+            raise TimeoutError("PodGC no completó la limpieza de los nodos locales desaparecidos")
+    print("Se comprobó el nodo EKS actual: " + hostname, flush=True)
+    return hostname
+
+
+def wait_services_ready(seconds=120, interval=2):
+    """Se comprueban endpoints no terminantes y readiness por la ruta NodePort real."""
+    deadline = time.monotonic() + seconds
+    last_error = "sin endpoints listos"
+    consecutive = 0
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            for service, port in (("payment", 30080), ("settlement", 30081)):
+                response = kube(
+                    "-n",
+                    "axiz",
+                    "get",
+                    "endpointslices",
+                    "-l",
+                    "kubernetes.io/service-name=axiz-" + service,
+                    "-o",
+                    "json",
+                    "--request-timeout=5s",
+                    capture_output=True,
+                    text=True,
+                    timeout=min(7, max(0.1, deadline - time.monotonic())),
+                )
+                slices = json.loads(response.stdout)
+                ready = any(
+                    endpoint.get("addresses")
+                    and endpoint.get("conditions", {}).get("ready") is True
+                    and endpoint.get("conditions", {}).get("terminating") is not True
+                    for item in slices.get("items", [])
+                    for endpoint in item.get("endpoints", [])
+                )
+                if not ready:
+                    raise ConnectionError("No se dispone de endpoints listos para " + service)
+                url = f"http://{CLUSTER_CONTAINER}:{port}/actuator/health/readiness"
+                with urllib.request.urlopen(
+                    url, timeout=min(3, max(0.1, deadline - time.monotonic()))
+                ) as health:
+                    status = json.load(health)
+                    if not isinstance(status, dict) or status.get("status") != "UP":
+                        raise ConnectionError("Readiness no está UP para " + service)
+            consecutive += 1
+            if consecutive == 3:
+                print("Se comprobaron ambos NodePorts y sus endpoints listos.", flush=True)
+                return
+        except urllib.error.HTTPError as error:
+            error.close()
+            if error.code not in {408, 429, 500, 502, 503, 504}:
+                raise RuntimeError(
+                    "Falló readiness por NodePort: HTTP " + str(error.code)
+                ) from error
+            consecutive = 0
+            last_error = "HTTP " + str(error.code)
+        except (OSError, subprocess.SubprocessError) as error:
+            consecutive = 0
+            last_error = str(error)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(interval, remaining))
+    raise TimeoutError(f"No se estabilizaron los Services EKS en {seconds}s: {last_error}")
+
+
+def diagnose_services():
+    """Se imprime estado del nodo y se consultan logs de pods no terminantes."""
+    commands = [
+        ("get", "nodes", "-o", "wide"),
+        ("describe", "nodes"),
+        ("-n", "axiz", "get", "pods,services,endpointslices", "-o", "wide"),
+        ("-n", "axiz", "get", "events", "--sort-by=.lastTimestamp"),
+    ]
+    print("Se recopila el diagnóstico EKS sin modificar recursos ni volúmenes.", flush=True)
+    for command in commands:
+        try:
+            kube(*command, "--request-timeout=5s", timeout=8)
+        except (OSError, subprocess.SubprocessError) as error:
+            print("No se pudo completar una consulta de diagnóstico: " + str(error), flush=True)
+    try:
+        current = docker(
+            "inspect",
+            CLUSTER_CONTAINER,
+            "--format",
+            "{{.Config.Hostname}}",
+            capture_output=True,
+            text=True,
+            timeout=8,
+        ).stdout.strip()
+        docker("logs", "--tail=80", CLUSTER_CONTAINER, timeout=8)
+    except (OSError, subprocess.SubprocessError) as error:
+        current = None
+        print("No se pudo consultar el runtime EKS: " + str(error), flush=True)
+    for service in ("payment", "settlement"):
+        try:
+            pods = json.loads(
+                kube(
+                    "-n",
+                    "axiz",
+                    "get",
+                    "pods",
+                    "-l",
+                    "app=axiz-" + service,
+                    "-o",
+                    "json",
+                    "--request-timeout=5s",
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                ).stdout
+            )
+            selected = [
+                p
+                for p in pods["items"]
+                if not p["metadata"].get("deletionTimestamp")
+                and (not current or p.get("spec", {}).get("nodeName") == current)
+            ]
+            for pod in selected[:3]:
+                kube(
+                    "-n",
+                    "axiz",
+                    "logs",
+                    "pod/" + pod["metadata"]["name"],
+                    "-c",
+                    service,
+                    "--tail=60",
+                    "--request-timeout=5s",
+                    timeout=8,
+                )
+            if not selected:
+                print(
+                    "No se dispone de pods actuales para consultar logs de " + service, flush=True
+                )
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            print("No se pudo consultar la aplicación " + service + ": " + str(error), flush=True)
+
+
+def deploy_resources():
     resources = json.loads((RUNTIME / "resources.json").read_text())
     broker = resources["brokers"].rsplit(":", 1)[0]
     aliases = [
@@ -94,6 +375,7 @@ def deploy():
         "axiz-settlement-service:2.0.0",
     ]:
         import_image(image)
+    recover_local_nodes()
     image_ids = {
         service: docker(
             "image",
@@ -243,6 +525,11 @@ def deploy():
                 "metadata": meta,
                 "spec": {
                     "replicas": 1,
+                    "minReadySeconds": 5,
+                    "strategy": {
+                        "type": "RollingUpdate",
+                        "rollingUpdate": {"maxUnavailable": 0, "maxSurge": 1},
+                    },
                     "selector": {"matchLabels": {"app": name}},
                     "template": {
                         "metadata": {
@@ -280,14 +567,12 @@ def deploy():
             "status",
             "deployment/axiz-" + service,
             "--timeout=240s",
+            timeout=250,
         )
-    # Se precargan datos mediante los Services publicados en el nodo Kubernetes.
+    wait_services_ready()
+    # Se precargan datos con replay idempotente ante un corte posterior a readiness.
     subprocess.run(
-        [
-            "python3",
-            "datasets/seed.py",
-            "http://" + CLUSTER_CONTAINER + ":30080",
-        ],
+        ["python3", "datasets/seed.py", "http://" + CLUSTER_CONTAINER + ":30080"],
         check=True,
         cwd=ROOT,
     )
@@ -302,6 +587,14 @@ def deploy():
         cwd=ROOT,
     )
     print("Se completó el despliegue EKS. API Gateway: " + resources["gateway"])
+
+
+def deploy():
+    try:
+        deploy_resources()
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
+        diagnose_services()
+        raise
 
 
 if __name__ == "__main__":

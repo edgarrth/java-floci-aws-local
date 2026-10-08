@@ -64,16 +64,22 @@ class PostgresAdaptersTest {
         "fingerprint",
         Payment.Status.ACCEPTED,
         "POLICY_ACCEPTED",
-        Instant.now());
+        Instant.parse("2026-01-01T00:00:00.123456789Z"));
   }
 
   @Test
   void paymentAndBothDestinationsArePersistedOnce() {
     var payment = accepted();
-    assertThat(store.record(payment)).isEqualTo(payment);
-    assertThat(store.record(payment)).isEqualTo(payment);
+    var persisted = store.record(payment);
+    assertThat(persisted).usingRecursiveComparison().ignoringFields("createdAt").isEqualTo(payment);
+    // Se comprueba el redondeo a microsegundos y el replay de la fecha persistida.
+    assertThat(persisted.createdAt()).isEqualTo(Instant.parse("2026-01-01T00:00:00.123457Z"));
+    assertThat(store.record(payment)).isEqualTo(persisted);
+    assertThat(store.find(payment.id())).contains(persisted);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payments", Long.class)).isEqualTo(1L);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox", Long.class)).isEqualTo(2L);
+    assertThat(jdbc.queryForList("SELECT destination FROM outbox", String.class))
+        .containsExactlyInAnyOrder("SNS", "KAFKA");
   }
 
   @Test
